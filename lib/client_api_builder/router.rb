@@ -7,6 +7,7 @@ module ClientApiBuilder
       base.extend InheritanceHelper::Methods
       base.extend ClassMethods
       base.include ::ClientApiBuilder::NetHTTP::Request
+      base.attr_reader :response
     end
 
     module ClassMethods
@@ -162,9 +163,9 @@ module ClientApiBuilder
         code += "  __body__ = build_body(__body__, __options__)\n"
         code += "  __headers__ = build_headers(__options__)\n"
         code += "  __connection_options__ = build_connection_options(__options__)\n"
-        code += "  __response__ = request(#{http_method.inspect}, __uri__, __body__, __headers__, __connection_options__)\n"
-        code += "  expected_response!(__response__, __expected_response_codes__, __options__)\n"
-        code += "  handle_response(__response__, __options__, &block)\n"
+        code += "  @response = request(#{http_method.inspect}, __uri__, __body__, __headers__, __connection_options__)\n"
+        code += "  expected_response!(@response, __expected_response_codes__, __options__)\n"
+        code += "  handle_response(@response, __options__, &block)\n"
         code += 'end'
 
         self.class_eval code, __FILE__, __LINE__
@@ -217,8 +218,17 @@ module ClientApiBuilder
       raise(::ClientApiBuilder::UnexpectedResponse.new("unexpected response code #{response.code}", response))
     end
 
+    def parse_response(response, options)
+      JSON.parse(response.body)
+    end
+
     def handle_response(response, options, &block)
-      response
+      data = parse_response(response, options)
+      if block
+        instance_exec(data, &block)
+      else
+        data
+      end
     end
   end
 end
