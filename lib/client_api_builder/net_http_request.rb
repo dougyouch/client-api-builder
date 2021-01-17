@@ -25,7 +25,7 @@ module ClientApiBuilder
 
       def request(method:, uri:, body:, headers:, connection_options:)
         request = METHOD_TO_NET_HTTP_CLASS[method].new(uri.request_uri, headers)
-        request_uri.body = body if body
+        request.body = body if body
 
         Net::HTTP.start(uri.hostname, uri.port, connection_options.merge(use_ssl: uri.scheme == 'https')) do |http|
           http.request(request)
