@@ -6,6 +6,7 @@ module ClientApiBuilder
     def self.included(base)
       base.extend InheritanceHelper::Methods
       base.extend ClassMethods
+      base.include ::ClientApiBuilder::NetHTTP::Request
     end
 
     module ClassMethods
@@ -63,17 +64,15 @@ module ClientApiBuilder
         when :query_params
           ClientApiBuilder::QueryParams.to_query(query)
         else
-          raise("unsupported query builder #{query_builder}")
+          query_builder.call(query)
         end
       end
 
-      def http_method(method_name, options)
-        return options[:method] if  options[:method]
-
+      def http_method(method_name)
         case method_name.to_s
         when /^(?:post|create|add|insert)/i
           :post
-        when /^(?:put|update|modify|change/i
+        when /^(?:put|update|modify|change)/i
           :put
         when /^(?:delete|remove)/i
           :delete
@@ -82,56 +81,115 @@ module ClientApiBuilder
         end
       end
 
-      def requires_body?(method, options)
+      def requires_body?(http_method, options)
         return !options[:no_body] if options.key?(:no_body)
-        return options[:has_body] if options[:has_body]
+        return options[:has_body] if options.key?(:has_body)
 
-        REQUIRED_BODY_HTTP_METHODS.include?(method)
+        REQUIRED_BODY_HTTP_METHODS.include?(http_method)
+      end
+
+      def hash_arguments(hsh)
+        arguments = []
+        hsh.each do |k, v|
+          case v
+          when Symbol
+            arguments << v
+          when Hash
+            arguments += hash_arguments(v)
+          end
+        end
+        arguments
       end
 
       def route(method_name, path, options = {})
-        query = options[:query] || {}
-        method_arguments = []
-        add_query_method_argument_proc = Proc.new do |k|
-          arg
-          query[k] = 
-        query.each { |k, v| v == :primary_arg ? query[k]
-        path_arguments = path.scan(/:[a-z_]+/)
-        primary_query_arguments = query.select { |_, v| v == :primary_arg }.values
-        query_arguments = query.select { |_, v| v == :arg }.values
-        http_method = http_method(method_name, options)
-        has_body_param = requires_body?(method, options)
+        http_method = options[:method] || http_method(method_name)
 
-        method_arguments = (primary_query_arguments + path_arguments + query_arguments).each_with_index.each_with_object({}) do |(param, idx), hsh|
-          
+        path_arguments = []
+        path.gsub!(/:([a-z0-9_]+)/i) do |_|
+          path_arguments << $1
+          "#\{#{$1}\}"
         end
-        
-        class_eval(
-<<-STR, __FILE__, __LINE__ + 1
-STR
-        )
+
+        has_body_param = requires_body?(http_method, options)
+
+        query =
+          if options[:query]
+            query_arguments = hash_arguments(options[:query])
+            str = options[:query].inspect
+            str.gsub!(/=>:/, '=>')
+            str
+          else
+            query_arguments = []
+            'nil'
+          end
+
+        body =
+          if options[:body]
+            has_body_param = false
+            body_arguments = hash_arguments(options[:body])
+            str = options[:body].inspect
+            str.gsub!(/=>:/, '=>')
+            str
+          else
+            body_arguments = []
+            'nil'
+          end
+
+        query_arguments.map!(&:to_s)
+        body_arguments.map!(&:to_s)
+        named_arguments = path_arguments + query_arguments + body_arguments
+        named_arguments.uniq!
+
+        code = "def #{method_name}("
+        code += named_arguments.map { |arg_name| "#{arg_name}:" }.join(', ')
+        code += ', __body__:' if has_body_param
+        code += ", **__options__)\n"
+        code += "  __path__ = \"#{path}\"\n"
+        code += "  __query__ = #{query}\n"
+        code += "  __body__ = #{body}\n" unless has_body_param
+        code += "  request(#{http_method.inspect}, create_uri(__path__, __query__, __options__), build_body(__body__, __options__), headers(__options__), connection_options(__options__))\n"
+        code += 'end'
+
+        self.class_eval code, __FILE__, __LINE__
       end
     end
 
-    def base_url
+    def base_url(options)
       self.class.base_url
     end
 
-    def headers
-      self.class.headers
+    def headers(options)
+      if options[:headers]
+        self.class.headers.merge(options[:headers])
+      else
+        self.class.headers
+      end
     end
 
-    def connection_options
-      self.class.connection_options
+    def connection_options(options)
+      if options[:connection_options]
+        self.class.connection_options.merge(options[:connection_options])
+      else
+        self.class.connection_options
+      end
     end
 
-    def build_query(query)
+    def build_query(query, options)
+      query.merge!(options[:query]) if options[:query]
       self.class.build_query(query)
     end
 
-    def create_uri(path, query)
-      uri = URI(base_url + path)
-      uri.query = build_query(query) if query
+    def build_body(body, options)
+      return unless body
+      return body if body.is_a?(String)
+
+      body.merge!(options[:body])
+      body.to_json
+    end
+
+    def create_uri(path, query, options)
+      uri = URI(base_url(options) + path)
+      uri.query = build_query(query, options) if query
       uri
     end
   end

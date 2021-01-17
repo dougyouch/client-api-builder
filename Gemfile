@@ -2,6 +2,8 @@
 
 source 'http://rubygems.org'
 
+gem 'inheritance-helper'
+
 group :development do
   gem 'rake'
   gem 'rubocop'
