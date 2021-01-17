@@ -23,7 +23,7 @@ module ClientApiBuilder
         unlock: Net::HTTP::Unlock
       }
 
-      def request(method, uri, body, headers, connection_options)
+      def request(method:, uri:, body:, headers:, connection_options:)
         request = METHOD_TO_NET_HTTP_CLASS[method].new(uri.request_uri, headers)
         request_uri.body = body if body
 

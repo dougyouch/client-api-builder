@@ -163,7 +163,7 @@ module ClientApiBuilder
         code += "  __body__ = build_body(__body__, __options__)\n"
         code += "  __headers__ = build_headers(__options__)\n"
         code += "  __connection_options__ = build_connection_options(__options__)\n"
-        code += "  @response = request(#{http_method.inspect}, __uri__, __body__, __headers__, __connection_options__)\n"
+        code += "  @response = request(method: #{http_method.inspect}, uri: __uri__, body: __body__, headers: __headers__, connection_options: __connection_options__)\n"
         code += "  expected_response!(@response, __expected_response_codes__, __options__)\n"
         code += "  handle_response(@response, __options__, &block)\n"
         code += 'end'
