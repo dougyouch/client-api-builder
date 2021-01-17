@@ -140,14 +140,31 @@ module ClientApiBuilder
         named_arguments = path_arguments + query_arguments + body_arguments
         named_arguments.uniq!
 
+        expected_response_codes =
+          if options[:expected_response_codes]
+            options[:expected_response_codes]
+          elsif options[:expected_response_code]
+            [options[:expected_response_code]]
+          else
+            []
+          end
+        expected_response_codes.map!(&:to_s)
+
         code = "def #{method_name}("
         code += named_arguments.map { |arg_name| "#{arg_name}:" }.join(', ')
         code += ', __body__:' if has_body_param
-        code += ", **__options__)\n"
+        code += ", **__options__, &block)\n"
         code += "  __path__ = \"#{path}\"\n"
         code += "  __query__ = #{query}\n"
         code += "  __body__ = #{body}\n" unless has_body_param
-        code += "  request(#{http_method.inspect}, create_uri(__path__, __query__, __options__), build_body(__body__, __options__), headers(__options__), connection_options(__options__))\n"
+        code += "  __expected_response_codes__ = #{expected_response_codes.inspect}\n"
+        code += "  __uri__ = build_uri(__path__, __query__, __options__)\n"
+        code += "  __body__ = build_body(__body__, __options__)\n"
+        code += "  __headers__ = build_headers(__options__)\n"
+        code += "  __connection_options__ = build_connection_options(__options__)\n"
+        code += "  __response__ = request(#{http_method.inspect}, __uri__, __body__, __headers__, __connection_options__)\n"
+        code += "  expected_response!(__response__, __expected_response_codes__, __options__)\n"
+        code += "  handle_response(__response__, __options__, &block)\n"
         code += 'end'
 
         self.class_eval code, __FILE__, __LINE__
@@ -158,7 +175,7 @@ module ClientApiBuilder
       self.class.base_url
     end
 
-    def headers(options)
+    def build_headers(options)
       if options[:headers]
         self.class.headers.merge(options[:headers])
       else
@@ -166,7 +183,7 @@ module ClientApiBuilder
       end
     end
 
-    def connection_options(options)
+    def build_connection_options(options)
       if options[:connection_options]
         self.class.connection_options.merge(options[:connection_options])
       else
@@ -187,10 +204,21 @@ module ClientApiBuilder
       body.to_json
     end
 
-    def create_uri(path, query, options)
+    def build_uri(path, query, options)
       uri = URI(base_url(options) + path)
       uri.query = build_query(query, options) if query
       uri
+    end
+
+    def expected_response!(response, expected_response_codes, options)
+      return if expected_response_codes.empty? && response.kind_of?(Net::HTTPSuccess)
+      return if expected_response_codes.include?(response.code)
+
+      raise(::ClientApiBuilder::UnexpectedResponse.new("unexpected response code #{response.code}", response))
+    end
+
+    def handle_response(response, options, &block)
+      response
     end
   end
 end
