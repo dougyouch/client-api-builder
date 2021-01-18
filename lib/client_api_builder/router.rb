@@ -89,20 +89,50 @@ module ClientApiBuilder
         REQUIRED_BODY_HTTP_METHODS.include?(http_method)
       end
 
-      def hash_arguments(hsh)
+      def get_hash_arguments(hsh)
         arguments = []
         hsh.each do |k, v|
           case v
           when Symbol
+            hsh[k] = "__||#{v}||__"
             arguments << v
           when Hash
-            arguments += hash_arguments(v)
+            arguments += get_hash_arguments(v)
+          when Array
+            arguments += get_array_arguments(v)
           end
         end
         arguments
       end
 
-      def route(method_name, path, options = {})
+      def get_array_arguments(list)
+        arguments = []
+        list.each_with_index do |v, idx|
+          case v
+          when Symbol
+            list[idx] = "__||#{v}||__"
+            arguments << v
+          when Hash
+            arguments += get_hash_arguments(v)
+          when Array
+            arguments += get_array_arguments(v)
+          end
+        end
+        arguments
+      end
+
+      def get_arguments(value)
+        case value
+        when Hash
+          get_hash_arguments(value)
+        when Array
+          get_array_arguments(value)
+        else
+          []
+        end
+      end
+
+      def generate_route_code(method_name, path, options = {})
         http_method = options[:method] || http_method(method_name)
 
         path_arguments = []
@@ -115,9 +145,9 @@ module ClientApiBuilder
 
         query =
           if options[:query]
-            query_arguments = hash_arguments(options[:query])
+            query_arguments = get_arguments(options[:query])
             str = options[:query].inspect
-            str.gsub!(/=>:/, '=>')
+            str.gsub!(/"__\|\|(.+?)\|\|__"/) { $1 }
             str
           else
             query_arguments = []
@@ -127,9 +157,9 @@ module ClientApiBuilder
         body =
           if options[:body]
             has_body_param = false
-            body_arguments = hash_arguments(options[:body])
+            body_arguments = get_arguments(options[:body])
             str = options[:body].inspect
-            str.gsub!(/=>:/, '=>')
+            str.gsub!(/"__\|\|(.+?)\|\|__"/) { $1 }
             str
           else
             body_arguments = []
@@ -167,8 +197,11 @@ module ClientApiBuilder
         code += "  expected_response!(@response, __expected_response_codes__, __options__)\n"
         code += "  handle_response(@response, __options__, &block)\n"
         code += 'end'
+        code
+      end
 
-        self.class_eval code, __FILE__, __LINE__
+      def route(method_name, path, options = {})
+        self.class_eval generate_route_code(method_name, path, options), __FILE__, __LINE__
       end
     end
 
@@ -201,7 +234,7 @@ module ClientApiBuilder
       return unless body
       return body if body.is_a?(String)
 
-      body.merge!(options[:body])
+      body.merge!(options[:body]) if options[:body]
       body.to_json
     end
 
