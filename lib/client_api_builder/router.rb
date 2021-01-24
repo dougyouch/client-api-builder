@@ -141,7 +141,7 @@ module ClientApiBuilder
           "#\{#{$1}\}"
         end
 
-        has_body_param = requires_body?(http_method, options)
+        has_body_param = options[:body].nil? && requires_body?(http_method, options)
 
         query =
           if options[:query]
@@ -163,7 +163,7 @@ module ClientApiBuilder
             str
           else
             body_arguments = []
-            'nil'
+            has_body_param ? 'body' : 'nil'
           end
 
         query_arguments.map!(&:to_s)
@@ -181,13 +181,14 @@ module ClientApiBuilder
           end
         expected_response_codes.map!(&:to_s)
 
-        code = "def #{method_name}("
-        code += named_arguments.map { |arg_name| "#{arg_name}:" }.join(', ')
-        code += ', __body__:' if has_body_param
-        code += ", **__options__, &block)\n"
+        method_args = named_arguments.map { |arg_name| "#{arg_name}:" }
+        method_args += ['body:'] if has_body_param
+        method_args += ['**__options__', '&block']
+
+        code = "def #{method_name}(" + method_args.join(', ') + ")\n"
         code += "  __path__ = \"#{path}\"\n"
         code += "  __query__ = #{query}\n"
-        code += "  __body__ = #{body}\n" unless has_body_param
+        code += "  __body__ = #{body}\n"
         code += "  __expected_response_codes__ = #{expected_response_codes.inspect}\n"
         code += "  __uri__ = build_uri(__path__, __query__, __options__)\n"
         code += "  __body__ = build_body(__body__, __options__)\n"
@@ -196,7 +197,7 @@ module ClientApiBuilder
         code += "  @response = request(method: #{http_method.inspect}, uri: __uri__, body: __body__, headers: __headers__, connection_options: __connection_options__)\n"
         code += "  expected_response!(@response, __expected_response_codes__, __options__)\n"
         code += "  handle_response(@response, __options__, &block)\n"
-        code += 'end'
+        code += "end\n"
         code
       end
 
