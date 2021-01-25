@@ -195,7 +195,7 @@ module ClientApiBuilder
         code += "  __headers__ = build_headers(__options__)\n"
         code += "  __connection_options__ = build_connection_options(__options__)\n"
         code += "  @response = request(method: #{http_method.inspect}, uri: __uri__, body: __body__, headers: __headers__, connection_options: __connection_options__)\n"
-        code += "  expected_response!(@response, __expected_response_codes__, __options__)\n"
+        code += "  expected_response_code!(@response, __expected_response_codes__, __options__)\n"
         code += "  handle_response(@response, __options__, &block)\n"
         code += "end\n"
         code
@@ -245,7 +245,7 @@ module ClientApiBuilder
       uri
     end
 
-    def expected_response!(response, expected_response_codes, options)
+    def expected_response_code!(response, expected_response_codes, options)
       return if expected_response_codes.empty? && response.kind_of?(Net::HTTPSuccess)
       return if expected_response_codes.include?(response.code)
 
@@ -253,7 +253,7 @@ module ClientApiBuilder
     end
 
     def parse_response(response, options)
-      JSON.parse(response.body)
+      response.body && JSON.parse(response.body)
     end
 
     def handle_response(response, options, &block)

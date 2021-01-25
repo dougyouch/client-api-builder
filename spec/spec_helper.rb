@@ -5,6 +5,7 @@ require 'bundler'
 require 'json'
 require 'securerandom'
 require 'simplecov'
+require 'webmock/rspec'
 
 SimpleCov.start
 
