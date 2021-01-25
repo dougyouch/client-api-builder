@@ -10,10 +10,10 @@ module ClientApiBuilder
       when Hash
         to_query_from_hash(data, (namespace ? CGI.escape(namespace) : nil), name_value_separator).join(param_separator)
       when Array
-        to_query_from_array(data, (namespace ? CGI.escape(namespace) : nil), name_value_separator).join(param_separator)
+        to_query_from_array(data, (namespace ? "#{CGI.escape(namespace)}[]" : '[]'), name_value_separator).join(param_separator)
       else
         if namespace
-          "#{CGI.escape(namespace)}#{name_value_separator}#{CGI.escape(value.to_s)}"
+          "#{CGI.escape(namespace)}#{name_value_separator}#{CGI.escape(data.to_s)}"
         else
           CGI.escape(data.to_s)
         end
