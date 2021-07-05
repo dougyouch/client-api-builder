@@ -51,7 +51,7 @@ module ClientApiBuilder
         add_value_to_class_method(:default_options, connection_options: connection_options)
       end
 
-      def query_param(name, value)
+      def query_param(name, value = nil, &block)
         query_params = default_options[:query_params].dup
         query_params[name] = value || block
         add_value_to_class_method(:default_options, query_params: query_params)
