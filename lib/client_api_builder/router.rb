@@ -38,9 +38,9 @@ module ClientApiBuilder
         add_value_to_class_method(:default_options, query_builder: builder)
       end
 
-      def header(name, value)
+      def header(name, value = nil, &block)
         headers = default_options[:headers].dup
-        headers[name] = value
+        headers[name] = value || block
         add_value_to_class_method(:default_options, headers: headers)
       end
 
@@ -211,11 +211,23 @@ module ClientApiBuilder
     end
 
     def build_headers(options)
-      if options[:headers]
-        self.class.headers.merge(options[:headers])
-      else
-        self.class.headers
+      headers = {}
+
+      add_header_proc = proc do |name, value|
+        headers[name] =
+          if value.is_a?(Proc)
+            instance_eval(&value)
+          elsif value.is_a?(Symbol)
+            send(value)
+          else
+            value
+          end
       end
+
+      self.class.headers.each(&add_header_proc)
+      options[:headers]&.each(&add_header_proc)
+
+      headers
     end
 
     def build_connection_options(options)

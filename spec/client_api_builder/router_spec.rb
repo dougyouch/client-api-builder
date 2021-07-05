@@ -2,7 +2,7 @@ require 'spec_helper'
 
 describe ClientApiBuilder::Router do
   let(:router_class) do
-    Class.new do
+    Struct.new(:authorization, :request_count) do
       include ClientApiBuilder::Router
 
       connection_option :open_timeout, 100
@@ -14,7 +14,9 @@ describe ClientApiBuilder::Router do
     end
   end
 
-  let(:router) { router_class.new }
+  let(:authorization) { SecureRandom.uuid }
+  let(:request_count) { rand(10_000) }
+  let(:router) { router_class.new(authorization, request_count) }
   let(:expected_base_url) { 'http://example.com' }
   let(:expected_connection_options) { {open_timeout: 100} }
 
@@ -75,7 +77,7 @@ describe ClientApiBuilder::Router do
     it { expect(router_class.http_method('create_user')).to eq(:post) }
     it { expect(router_class.http_method('update_user')).to eq(:put) }
     it { expect(router_class.http_method('delete_user')).to eq(:delete) }
-    it { expect(router_class.http_method('unknown')).to eq(:get) }
+   it { expect(router_class.http_method('unknown')).to eq(:get) }
   end
 
   context '.get_arguments' do
@@ -310,5 +312,35 @@ CODE
       it { expect(generated_code).to eq(expected_code) }
       it { expect(subject).to eq(true) }
     end
+  end
+
+  context '.build_headers' do
+    let(:route_options) do
+      {
+        headers: {
+          'X-Frame' => 'top',
+          'X-Prev-Request-Count' => :request_count,
+          'X-Request-Count' => proc { request_count + 2 }
+        }
+      }
+    end
+    subject { router.build_headers(route_options) }
+    let(:expected_headers) do
+      {
+        'Content-Type' => 'application/json',
+        'Authorization' => authorization,
+        'X-Tracking' => (request_count + 1),
+        'X-Frame' => 'top',
+        'X-Prev-Request-Count' => request_count,
+        'X-Request-Count' => (request_count + 2)
+      }
+    end
+
+    before do
+      router_class.header 'Authorization', :authorization
+      router_class.header('X-Tracking') { request_count + 1 }
+    end
+
+    it { expect(subject).to eq(expected_headers) }
   end
 end
