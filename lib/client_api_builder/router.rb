@@ -22,6 +22,7 @@ module ClientApiBuilder
           base_url: nil,
           headers: {},
           connection_options: {},
+          query_params: {},
           query_builder: Hash.method_defined?(:to_query) ? :to_query : :query_params
         }.freeze
       end
@@ -50,12 +51,22 @@ module ClientApiBuilder
         add_value_to_class_method(:default_options, connection_options: connection_options)
       end
 
+      def query_param(name, value)
+        query_params = default_options[:query_params].dup
+        query_params[name] = value || block
+        add_value_to_class_method(:default_options, query_params: query_params)
+      end
+
       def headers
         default_options[:headers]
       end
 
       def connection_options
         default_options[:connection_options]
+      end
+
+      def query_params
+        default_options[:query_params]
       end
 
       def build_query(query)
@@ -239,8 +250,23 @@ module ClientApiBuilder
     end
 
     def build_query(query, options)
-      query.merge!(options[:query]) if options[:query]
-      self.class.build_query(query)
+      query_params = {}
+
+      add_query_param_proc = proc do |name, value|
+        query_params[name] =
+          if value.is_a?(Proc)
+            instance_eval(&value)
+          elsif value.is_a?(Symbol)
+            send(value)
+          else
+            value
+          end
+      end
+
+      self.class.query_params.each(&add_query_param_proc)
+      query&.each(&add_query_param_proc)
+
+      self.class.build_query(query_params)
     end
 
     def build_body(body, options)
