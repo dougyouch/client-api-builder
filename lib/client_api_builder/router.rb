@@ -269,7 +269,16 @@ module ClientApiBuilder
     end
 
     def handle_response(response, options, &block)
-      data = parse_response(response, options)
+      data =
+        case options[:return]
+        when :response
+          response
+        when :body
+          response.body
+        else
+          parse_response(response, options)
+        end
+
       if block
         instance_exec(data, &block)
       else
