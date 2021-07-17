@@ -2,6 +2,9 @@
 # frozen_string_literal: true
 
 $LOAD_PATH << File.expand_path('../lib', __dir__)
+$LOAD_PATH << File.expand_path('../examples', __dir__)
 require 'client-api-builder'
+autoload :BasicAuthExampleClient, 'basic_auth_example_client'
+autoload :IMDBDatesetsClient, 'imdb_datasets_client'
 require 'irb'
 IRB.start(__FILE__)

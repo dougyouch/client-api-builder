@@ -37,13 +37,13 @@ module ClientApiBuilder
       def stream(method:, uri:, body:, headers:, connection_options:)
         request(method: method, uri: uri, body: body, headers: headers, connection_options: connection_options) do |response|
           response.read_body do |chunk|
-            yield chunk
+            yield response, chunk
           end
         end
       end
 
       def stream_to_io(method:, uri:, body:, headers:, connection_options:, io:)
-        stream(method: method, uri: uri, body: body, headers: headers, connection_options: connection_options) do |chunk|
+        stream(method: method, uri: uri, body: body, headers: headers, connection_options: connection_options) do |_, chunk|
           io.write chunk
         end
       end

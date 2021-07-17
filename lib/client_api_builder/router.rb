@@ -220,9 +220,10 @@ module ClientApiBuilder
 
         case options[:stream]
         when true,
-             :file,
-             :io
+             :file
           code += "  @response = stream_to_file(**@request_options)\n"
+        when :io
+          code += "  @response = stream_to_io(**@request_options)\n"
         when :block
           code += "  @response = stream(**@request_options, &block)\n"
         else
