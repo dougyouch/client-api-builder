@@ -192,8 +192,18 @@ module ClientApiBuilder
           end
         expected_response_codes.map!(&:to_s)
 
+        stream_param =
+          case options[:stream]
+          when true,
+               :file
+            :file
+          when :io
+            :io
+          end
+
         method_args = named_arguments.map { |arg_name| "#{arg_name}:" }
         method_args += ['body:'] if has_body_param
+        method_args += ["#{stream_param}:"] if stream_param
         method_args += ['**__options__', '&block']
 
         code = "def #{method_name}(" + method_args.join(', ') + ")\n"
@@ -206,9 +216,29 @@ module ClientApiBuilder
         code += "  __headers__ = build_headers(__options__)\n"
         code += "  __connection_options__ = build_connection_options(__options__)\n"
         code += "  @request_options = {method: #{http_method.inspect}, uri: __uri__, body: __body__, headers: __headers__, connection_options: __connection_options__}\n"
-        code += "  @response = request(**@request_options)\n"
+        code += "  @request_options[:#{stream_param}] = #{stream_param}\n" if stream_param
+
+        case options[:stream]
+        when true,
+             :file,
+             :io
+          code += "  @response = stream_to_file(**@request_options)\n"
+        when :block
+          code += "  @response = stream(**@request_options, &block)\n"
+        else
+          code += "  @response = request(**@request_options)\n"
+        end
+
         code += "  expected_response_code!(@response, __expected_response_codes__, __options__)\n"
-        code += "  handle_response(@response, __options__, &block)\n"
+
+        if options[:stream] || options[:return] == :response
+          code += "  @response\n"
+        elsif options[:return] == :body
+          code += "  @response.body\n"
+        else
+          code += "  handle_response(@response, __options__, &block)\n"
+        end
+
         code += "end\n"
         code
       end

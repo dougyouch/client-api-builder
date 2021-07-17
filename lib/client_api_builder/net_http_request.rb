@@ -28,7 +28,30 @@ module ClientApiBuilder
         request.body = body if body
 
         Net::HTTP.start(uri.hostname, uri.port, connection_options.merge(use_ssl: uri.scheme == 'https')) do |http|
-          http.request(request)
+          http.request(request) do |response|
+            yield response if block_given?
+          end
+        end
+      end
+
+      def stream(method:, uri:, body:, headers:, connection_options:)
+        request(method: method, uri: uri, body: body, headers: headers, connection_options: connection_options) do |response|
+          response.read_body do |chunk|
+            yield chunk
+          end
+        end
+      end
+
+      def stream_to_io(method:, uri:, body:, headers:, connection_options:, io:)
+        stream(method: method, uri: uri, body: body, headers: headers, connection_options: connection_options) do |chunk|
+          io.write chunk
+        end
+      end
+
+      def stream_to_file(method:, uri:, body:, headers:, connection_options:, file:)
+        mode = connection_options.delete(:file_mode) || 'wb'
+        File.open(file, mode) do |io|
+          stream_to_io(method: method, uri: uri, body: body, headers: headers, connection_options: connection_options, io: io)
         end
       end
     end
