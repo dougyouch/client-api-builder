@@ -155,8 +155,8 @@ def create_user(app_id:, auth:, name:, email:, **__options__, &block)
   __body__ = build_body(__body__, __options__)
   __headers__ = build_headers(__options__)
   __connection_options__ = build_connection_options(__options__)
-  @request = {method: :post, uri: __uri__, body: __body__, headers: __headers__, connection_options: __connection_options__}
-  @response = request(**@request)
+  @request_options = {method: :post, uri: __uri__, body: __body__, headers: __headers__, connection_options: __connection_options__}
+  @response = request(**@request_options)
   expected_response_code!(@response, __expected_response_codes__, __options__)
   handle_response(@response, __options__, &block)
 end
@@ -183,8 +183,8 @@ def get_user(app_id:, user_id:, auth:, **__options__, &block)
   __body__ = build_body(__body__, __options__)
   __headers__ = build_headers(__options__)
   __connection_options__ = build_connection_options(__options__)
-  @request = {method: :get, uri: __uri__, body: __body__, headers: __headers__, connection_options: __connection_options__}
-  @response = request(**@request)
+  @request_options = {method: :get, uri: __uri__, body: __body__, headers: __headers__, connection_options: __connection_options__}
+  @response = request(**@request_options)
   expected_response_code!(@response, __expected_response_codes__, __options__)
   handle_response(@response, __options__, &block)
 end
@@ -224,8 +224,8 @@ def get_users(app_id:, **__options__, &block)
   __body__ = build_body(__body__, __options__)
   __headers__ = build_headers(__options__)
   __connection_options__ = build_connection_options(__options__)
-  @request = {method: :get, uri: __uri__, body: __body__, headers: __headers__, connection_options: __connection_options__}
-  @response = request(**@request)
+  @request_options = {method: :get, uri: __uri__, body: __body__, headers: __headers__, connection_options: __connection_options__}
+  @response = request(**@request_options)
   expected_response_code!(@response, __expected_response_codes__, __options__)
   handle_response(@response, __options__, &block)
 end
@@ -264,8 +264,8 @@ def delete_user(app_id:, user_id:, **__options__, &block)
   __body__ = build_body(__body__, __options__)
   __headers__ = build_headers(__options__)
   __connection_options__ = build_connection_options(__options__)
-  @request = {method: :delete, uri: __uri__, body: __body__, headers: __headers__, connection_options: __connection_options__}
-  @response = request(**@request)
+  @request_options = {method: :delete, uri: __uri__, body: __body__, headers: __headers__, connection_options: __connection_options__}
+  @response = request(**@request_options)
   expected_response_code!(@response, __expected_response_codes__, __options__)
   handle_response(@response, __options__, &block)
 end
@@ -306,8 +306,8 @@ def create_app(body:, **__options__, &block)
   __body__ = build_body(__body__, __options__)
   __headers__ = build_headers(__options__)
   __connection_options__ = build_connection_options(__options__)
-  @request = {method: :post, uri: __uri__, body: __body__, headers: __headers__, connection_options: __connection_options__}
-  @response = request(**@request)
+  @request_options = {method: :post, uri: __uri__, body: __body__, headers: __headers__, connection_options: __connection_options__}
+  @response = request(**@request_options)
   expected_response_code!(@response, __expected_response_codes__, __options__)
   handle_response(@response, __options__, &block)
 end

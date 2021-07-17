@@ -7,7 +7,7 @@ module ClientApiBuilder
       base.extend InheritanceHelper::Methods
       base.extend ClassMethods
       base.include ::ClientApiBuilder::NetHTTP::Request
-      base.attr_reader :response
+      base.attr_reader :response, :request_options
     end
 
     module ClassMethods
@@ -205,8 +205,8 @@ module ClientApiBuilder
         code += "  __body__ = build_body(__body__, __options__)\n"
         code += "  __headers__ = build_headers(__options__)\n"
         code += "  __connection_options__ = build_connection_options(__options__)\n"
-        code += "  @request = {method: #{http_method.inspect}, uri: __uri__, body: __body__, headers: __headers__, connection_options: __connection_options__}\n"
-        code += "  @response = request(**@request)\n"
+        code += "  @request_options = {method: #{http_method.inspect}, uri: __uri__, body: __body__, headers: __headers__, connection_options: __connection_options__}\n"
+        code += "  @response = request(**@request_options)\n"
         code += "  expected_response_code!(@response, __expected_response_codes__, __options__)\n"
         code += "  handle_response(@response, __options__, &block)\n"
         code += "end\n"
