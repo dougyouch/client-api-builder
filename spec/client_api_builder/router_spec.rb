@@ -2,7 +2,7 @@ require 'spec_helper'
 
 describe ClientApiBuilder::Router do
   let(:router_class) do
-    Struct.new(:authorization, :request_count) do
+    Struct.new(:authorization, :request_count, :app_key) do
       include ClientApiBuilder::Router
 
       connection_option :open_timeout, 100
@@ -11,12 +11,14 @@ describe ClientApiBuilder::Router do
 
       route :get_user, '/users/:id', query: {app_id: :app_id}
       route :create_user, '/users', query: {app_id: :app_id}
+      route :get_app_users, '/apps/{app_key}/users'
     end
   end
 
   let(:authorization) { SecureRandom.uuid }
   let(:request_count) { rand(10_000) }
-  let(:router) { router_class.new(authorization, request_count) }
+  let(:app_key) { SecureRandom.uuid }
+  let(:router) { router_class.new(authorization, request_count, app_key) }
   let(:expected_base_url) { 'http://example.com' }
   let(:expected_connection_options) { {open_timeout: 100} }
 
@@ -316,6 +318,37 @@ CODE
 
       it { expect(generated_code).to eq(expected_code) }
       it { expect(subject).to eq(true) }
+    end
+
+    describe 'instance methods in path' do
+      let(:method_name) { :get_app_users }
+      let(:path) { '/apps/{app_key}/users' }
+      let(:body) { nil }
+      let(:query) { nil }
+      let(:expected_response_code) { 200 }
+
+      let(:expected_code) do
+        <<-CODE
+def get_app_users(**__options__, &block)
+  __path__ = "/apps/\#{app_key}/users"
+  __query__ = nil
+  __body__ = nil
+  __expected_response_codes__ = ["200"]
+  __uri__ = build_uri(__path__, __query__, __options__)
+  __body__ = build_body(__body__, __options__)
+  __headers__ = build_headers(__options__)
+  __connection_options__ = build_connection_options(__options__)
+  @request_options = {method: :get, uri: __uri__, body: __body__, headers: __headers__, connection_options: __connection_options__}
+  @response = request(**@request_options)
+  expected_response_code!(@response, __expected_response_codes__, __options__)
+  handle_response(@response, __options__, &block)
+end
+CODE
+      end
+
+      it { expect(generated_code).to eq(expected_code) }
+      it { expect(subject).to eq(true) }
+
     end
   end
 

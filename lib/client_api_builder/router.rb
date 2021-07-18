@@ -146,6 +146,11 @@ module ClientApiBuilder
       def generate_route_code(method_name, path, options = {})
         http_method = options[:method] || http_method(method_name)
 
+        # instance method
+        path.gsub!(/\{([a-z0-9_]+)\}/i) do |_|
+          "#\{#{$1}\}"
+        end
+
         path_arguments = []
         path.gsub!(/:([a-z0-9_]+)/i) do |_|
           path_arguments << $1
