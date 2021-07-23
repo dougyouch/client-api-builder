@@ -143,8 +143,21 @@ module ClientApiBuilder
         end
       end
 
+      @@namespaces = []
+      def namespaces
+        @@namespaces
+      end
+
+      def namespace(name)
+        namespaces << name
+        yield
+        namespaces.pop
+      end
+
       def generate_route_code(method_name, path, options = {})
         http_method = options[:method] || http_method(method_name)
+
+        path = namespaces.join + path
 
         # instance method
         path.gsub!(/\{([a-z0-9_]+)\}/i) do |_|

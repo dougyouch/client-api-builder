@@ -11,7 +11,12 @@ describe ClientApiBuilder::Router do
 
       route :get_user, '/users/:id', query: {app_id: :app_id}
       route :create_user, '/users', query: {app_id: :app_id}
-      route :get_app_users, '/apps/{app_key}/users'
+
+      namespace '/v2' do
+        namespace '/apps' do
+          route :get_app_users, '/{app_key}/users'
+        end
+      end
     end
   end
 
@@ -115,7 +120,7 @@ describe ClientApiBuilder::Router do
 
   context '.route' do
     let(:method_name) { :create_user }
-    let(:path) { '/apps/:app_id/users' }
+    let(:path) { '/v2/apps/:app_id/users' }
     let(:query) { {auth: :auth} }
     let(:body) { {user: {name: :name, email: :email}} }
     let(:expected_response_codes) { nil }
@@ -142,14 +147,14 @@ describe ClientApiBuilder::Router do
       }
     end
     let(:create_stubbed_response) do
-      stub_request(:post, "http://example.com/apps/8/users?auth=secret").
+      stub_request(:post, "http://example.com/v2/apps/8/users?auth=secret").
         to_return(status: 201, body: expected_route_return_value.to_json)
     end
 
     let(:expected_code) do
       <<-CODE
 def create_user(app_id:, auth:, name:, email:, **__options__, &block)
-  __path__ = "/apps/\#{app_id}/users"
+  __path__ = "/v2/apps/\#{app_id}/users"
   __query__ = {:auth=>auth}
   __body__ = {:user=>{:name=>name, :email=>email}}
   __expected_response_codes__ = []
@@ -170,14 +175,14 @@ CODE
     it { subject; create_stubbed_response; expect(call_route).to eq(expected_route_return_value) }
 
     describe 'get request no body' do
-      let(:path) { '/apps/:app_id/users/:user_id' }
+      let(:path) { '/v2/apps/:app_id/users/:user_id' }
       let(:method_name) { :get_user }
       let(:body) { nil }
 
       let(:expected_code) do
         <<-CODE
 def get_user(app_id:, user_id:, auth:, **__options__, &block)
-  __path__ = "/apps/\#{app_id}/users/\#{user_id}"
+  __path__ = "/v2/apps/\#{app_id}/users/\#{user_id}"
   __query__ = {:auth=>auth}
   __body__ = nil
   __expected_response_codes__ = []
@@ -200,7 +205,7 @@ CODE
         }
       end
       let(:create_stubbed_response) do
-        stub_request(:get, "http://example.com/apps/8/users/6?auth=secret").
+        stub_request(:get, "http://example.com/v2/apps/8/users/6?auth=secret").
           to_return(status: 200, body: expected_route_return_value.to_json)
       end
 
@@ -218,7 +223,7 @@ CODE
       let(:expected_code) do
         <<-CODE
 def get_users(app_id:, **__options__, &block)
-  __path__ = "/apps/\#{app_id}/users"
+  __path__ = "/v2/apps/\#{app_id}/users"
   __query__ = nil
   __body__ = nil
   __expected_response_codes__ = ["202"]
@@ -239,7 +244,7 @@ CODE
         }
       end
       let(:create_stubbed_response) do
-        stub_request(:get, "http://example.com/apps/8/users").
+        stub_request(:get, "http://example.com/v2/apps/8/users").
           to_return(status: 202, body: expected_route_return_value.to_json)
       end
 
@@ -249,7 +254,7 @@ CODE
     end
 
     describe 'delete request' do
-      let(:path) { '/apps/:app_id/users/:user_id' }
+      let(:path) { '/v2/apps/:app_id/users/:user_id' }
       let(:method_name) { :delete_user }
       let(:body) { nil }
       let(:query) { nil }
@@ -258,7 +263,7 @@ CODE
       let(:expected_code) do
         <<-CODE
 def delete_user(app_id:, user_id:, **__options__, &block)
-  __path__ = "/apps/\#{app_id}/users/\#{user_id}"
+  __path__ = "/v2/apps/\#{app_id}/users/\#{user_id}"
   __query__ = nil
   __body__ = nil
   __expected_response_codes__ = ["200", "204"]
@@ -280,7 +285,7 @@ CODE
         }
       end
       let(:create_stubbed_response) do
-        stub_request(:delete, "http://example.com/apps/8/users/6").
+        stub_request(:delete, "http://example.com/v2/apps/8/users/6").
           to_return(status: 204, body: '')
       end
       let(:expected_route_return_value) { nil }
@@ -291,7 +296,7 @@ CODE
     end
 
     describe 'create request' do
-      let(:path) { '/apps' }
+      let(:path) { '/v2/apps' }
       let(:method_name) { :create_app }
       let(:body) { nil }
       let(:query) { nil }
@@ -300,7 +305,7 @@ CODE
       let(:expected_code) do
         <<-CODE
 def create_app(body:, **__options__, &block)
-  __path__ = "/apps"
+  __path__ = "/v2/apps"
   __query__ = nil
   __body__ = body
   __expected_response_codes__ = ["201"]
@@ -322,7 +327,7 @@ CODE
 
     describe 'instance methods in path' do
       let(:method_name) { :get_app_users }
-      let(:path) { '/apps/{app_key}/users' }
+      let(:path) { '/v2/apps/{app_key}/users' }
       let(:body) { nil }
       let(:query) { nil }
       let(:expected_response_code) { 200 }
@@ -330,7 +335,7 @@ CODE
       let(:expected_code) do
         <<-CODE
 def get_app_users(**__options__, &block)
-  __path__ = "/apps/\#{app_key}/users"
+  __path__ = "/v2/apps/\#{app_key}/users"
   __query__ = nil
   __body__ = nil
   __expected_response_codes__ = ["200"]
