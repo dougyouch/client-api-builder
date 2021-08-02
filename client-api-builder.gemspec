@@ -10,4 +10,6 @@ Gem::Specification.new do |s|
   s.email       = 'dougyouch@gmail.com'
   s.homepage    = 'https://github.com/dougyouch/client-api-builder'
   s.files       = `git ls-files -z`.split("\x0").reject { |f| f.match(%r{^(test|spec|features)/}) }
+
+  s.add_runtime_dependency 'inheritance-helper', '>= 0.2.5'
 end

@@ -143,6 +143,10 @@ module ClientApiBuilder
         end
       end
 
+      def get_instance_method(var)
+         "#\{#{var}\}"
+      end
+
       @@namespaces = []
       def namespaces
         @@namespaces
@@ -161,7 +165,7 @@ module ClientApiBuilder
 
         # instance method
         path.gsub!(/\{([a-z0-9_]+)\}/i) do |_|
-          "#\{#{$1}\}"
+          get_instance_method($1)
         end
 
         path_arguments = []
@@ -268,7 +272,7 @@ module ClientApiBuilder
     end
 
     def base_url(options)
-      self.class.base_url
+      options[:base_url] || self.class.base_url
     end
 
     def build_headers(options)
