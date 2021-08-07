@@ -18,8 +18,12 @@ module ClientApiBuilder
         )
 
         code = <<CODE
+def self.#{name}_router
+  #{kls.name}
+end
+
 def #{name}
-  @#{name} ||= #{kls.name}.new(self)
+  @#{name} ||= self.class.#{name}_router.new(self)
 end
 CODE
         self.class_eval code, __FILE__, __LINE__

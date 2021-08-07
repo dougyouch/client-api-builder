@@ -50,5 +50,40 @@ describe ClientApiBuilder::NestedRouter do
     subject { router.login.create_session(username: username, password: password) }
 
     it { expect(subject).to eq(expected_auth_token) }
+    it { subject; expect(router.auth_token).to eq(expected_auth_token) }
+
+    describe 'code' do
+      let(:method_name) { :create_session }
+      let(:path) { '/sessions' }
+      let(:query) { nil }
+      let(:body) { {username: :username, password: :password} }
+      let(:expected_response_codes) { nil }
+      let(:expected_response_code) { 201 }
+      let(:generated_code) { router_class.login_router.generate_route_code(method_name, path, query: query, body: body, expected_response_codes: expected_response_codes, expected_response_code: expected_response_code) }
+
+      subject { generated_code }
+
+      let(:expected_code) do
+        <<STR
+def create_session(username:, password:, **__options__, &block)
+  block = self.class.response_proc(:create_session) || block
+  __path__ = "/sessions"
+  __query__ = nil
+  __body__ = {:username=>username, :password=>password}
+  __expected_response_codes__ = ["201"]
+  __uri__ = build_uri(__path__, __query__, __options__)
+  __body__ = build_body(__body__, __options__)
+  __headers__ = build_headers(__options__)
+  __connection_options__ = build_connection_options(__options__)
+  @request_options = {method: :post, uri: __uri__, body: __body__, headers: __headers__, connection_options: __connection_options__}
+  @response = request(**@request_options)
+  expected_response_code!(@response, __expected_response_codes__, __options__)
+  handle_response(@response, __options__, &block)
+end
+STR
+      end
+
+      it { expect(subject).to eq(expected_code) }
+    end
   end
 end
