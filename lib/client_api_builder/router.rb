@@ -6,6 +6,7 @@ module ClientApiBuilder
     def self.included(base)
       base.extend InheritanceHelper::Methods
       base.extend ClassMethods
+      base.include ::ClientApiBuilder::Section
       base.include ::ClientApiBuilder::NetHTTP::Request
       base.attr_reader :response, :request_options
     end

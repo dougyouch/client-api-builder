@@ -95,7 +95,7 @@ module ClientApiBuilder
     end
 
     def handle_response(response, options, &block)
-      parse_response.handle_response(response, options, &block)
+      parent_router.handle_response(response, options, &block)
     end
   end
 end
