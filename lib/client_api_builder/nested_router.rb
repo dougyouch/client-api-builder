@@ -90,10 +90,6 @@ module ClientApiBuilder
       parent_router.expected_response_code!(response, expected_response_codes, options)
     end
 
-    def parse_response(response, options)
-      parent_router.parse_response(response, options)
-    end
-
     def handle_response(response, options, &block)
       parent_router.handle_response(response, options, &block)
     end

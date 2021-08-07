@@ -24,8 +24,21 @@ module ClientApiBuilder
           headers: {},
           connection_options: {},
           query_params: {},
-          query_builder: Hash.method_defined?(:to_query) ? :to_query : :query_params
+          query_builder: Hash.method_defined?(:to_query) ? :to_query : :query_params,
+          response_procs: {}
         }.freeze
+      end
+
+
+      def add_response_procs(method_name, proc)
+        response_procs = default_options[:response_procs].dup
+        response_procs[method_name] = proc
+        add_value_to_class_method(:default_options, response_procs: response_procs)
+      end
+
+      def response_proc(method_name)
+        proc = default_options[:response_procs][method_name]
+        proc
       end
 
       def base_url(url = nil)
@@ -230,6 +243,7 @@ module ClientApiBuilder
         method_args += ['**__options__', '&block']
 
         code = "def #{method_name}(" + method_args.join(', ') + ")\n"
+        code += "  block = self.class.response_proc(#{method_name.inspect}) || block\n"
         code += "  __path__ = \"#{path}\"\n"
         code += "  __query__ = #{query}\n"
         code += "  __body__ = #{body}\n"
@@ -267,7 +281,9 @@ module ClientApiBuilder
         code
       end
 
-      def route(method_name, path, options = {})
+      def route(method_name, path, options = {}, &block)
+        add_response_procs(method_name, block) if block
+
         self.class_eval generate_route_code(method_name, path, options), __FILE__, __LINE__
       end
     end
