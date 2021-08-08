@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+# Purpose is to encapsulate adding nested routers
 module ClientApiBuilder
   module Section
     def self.included(base)

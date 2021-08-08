@@ -62,6 +62,8 @@ module ClientApiBuilder
     end
 
     def build_query(query, options)
+      return nil if query.nil? && parent_router.class.query_params.empty? && self.class.query_params.empty?
+
       query_params = {}
 
       add_query_param_proc = proc do |name, value|

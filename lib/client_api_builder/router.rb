@@ -243,7 +243,7 @@ module ClientApiBuilder
         method_args += ['**__options__', '&block']
 
         code = "def #{method_name}(" + method_args.join(', ') + ")\n"
-        code += "  block = self.class.response_proc(#{method_name.inspect}) || block\n"
+        code += "  block ||= self.class.response_proc(#{method_name.inspect})\n"
         code += "  __path__ = \"#{path}\"\n"
         code += "  __query__ = #{query}\n"
         code += "  __body__ = #{body}\n"
@@ -321,6 +321,8 @@ module ClientApiBuilder
     end
 
     def build_query(query, options)
+      return nil if query.nil? && self.class.query_params.empty?
+
       query_params = {}
 
       add_query_param_proc = proc do |name, value|
@@ -344,13 +346,12 @@ module ClientApiBuilder
       return unless body
       return body if body.is_a?(String)
 
-      body.merge!(options[:body]) if options[:body]
-      body.to_json
+      (options[:body] || body).to_json
     end
 
     def build_uri(path, query, options)
       uri = URI(base_url(options) + path)
-      uri.query = build_query(query, options) if query
+      uri.query = build_query(query, options)
       uri
     end
 

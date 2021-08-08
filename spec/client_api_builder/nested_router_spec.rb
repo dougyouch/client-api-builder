@@ -13,11 +13,13 @@ describe ClientApiBuilder::NestedRouter do
       connection_option :open_timeout, 100
       base_url 'http://api.example.com'
       header 'Content-Type', 'application/json'
+      query_param 'cachebuster', 1
 
       section :login do
         connection_option :open_timeout, 1000
         header 'X-AuthType', 'JSON'
         base_url 'http://login.example.com'
+        query_param 'cachebuster', 5
 
         route(:create_session, '/sessions', body: {username: :username, password: :password}, expected_response_code: 201) do |res|
           self.auth_token = res['session']['token']
@@ -34,7 +36,7 @@ describe ClientApiBuilder::NestedRouter do
   context 'section' do
     let(:expected_auth_token) { SecureRandom.uuid }
     before do
-      stub_request(:post, "http://login.example.com/sessions").
+      stub_request(:post, "http://login.example.com/sessions?cachebuster=5").
         with(
           body: "{\"username\":\"#{username}\",\"password\":\"#{password}\"}",
           headers: {
@@ -66,7 +68,7 @@ describe ClientApiBuilder::NestedRouter do
       let(:expected_code) do
         <<STR
 def create_session(username:, password:, **__options__, &block)
-  block = self.class.response_proc(:create_session) || block
+  block ||= self.class.response_proc(:create_session)
   __path__ = "/sessions"
   __query__ = nil
   __body__ = {:username=>username, :password=>password}
@@ -84,6 +86,13 @@ STR
       end
 
       it { expect(subject).to eq(expected_code) }
+    end
+
+    describe 'block override' do
+      subject { router.login.create_session(username: username, password: password) { nil } }
+
+      it { expect(subject).to eq(nil) }
+      it { subject; expect(router.auth_token).to eq(nil) }
     end
   end
 end
