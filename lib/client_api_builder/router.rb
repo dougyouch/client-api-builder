@@ -21,10 +21,11 @@ module ClientApiBuilder
       def default_options
         {
           base_url: nil,
-          headers: {},
+          body_builder: :to_json,
           connection_options: {},
-          query_params: {},
+          headers: {},
           query_builder: Hash.method_defined?(:to_query) ? :to_query : :query_params,
+          query_params: {},
           response_procs: {}
         }.freeze
       end
@@ -45,6 +46,12 @@ module ClientApiBuilder
         return default_options[:base_url] unless url
 
         add_value_to_class_method(:default_options, base_url: url)
+      end
+
+      def body_builder(builder = nil)
+        return default_options[:body_builder] unless builder
+
+        add_value_to_class_method(:default_options, body_builder: builder)
       end
 
       def query_builder(builder = nil)
@@ -81,6 +88,21 @@ module ClientApiBuilder
 
       def query_params
         default_options[:query_params]
+      end
+
+      def build_body(router, body, options)
+        builder = options[:body_builder] || body_builder
+
+        case builder
+        when :to_json
+          body.to_json
+        when :to_query
+          body.to_query
+        when :query_params
+          ClientApiBuilder::QueryParams.to_query(body)
+        else
+          router.instance_exec(body, &builder)
+        end
       end
 
       def build_query(query)
@@ -125,6 +147,8 @@ module ClientApiBuilder
             arguments += get_hash_arguments(v)
           when Array
             arguments += get_array_arguments(v)
+          when String
+            hsh[k] = "__||#{$1}||__" if v =~ /\{([a-z0-9_]+)\}/i
           end
         end
         arguments
@@ -141,6 +165,8 @@ module ClientApiBuilder
             arguments += get_hash_arguments(v)
           when Array
             arguments += get_array_arguments(v)
+          when String
+            list[idx] = "__||#{$1}||__" if v =~ /\{([a-z0-9_]+)\}/i
           end
         end
         arguments
@@ -338,15 +364,18 @@ module ClientApiBuilder
 
       self.class.query_params.each(&add_query_param_proc)
       query&.each(&add_query_param_proc)
+      options[:query]&.each(&add_query_param_proc)
 
       self.class.build_query(query_params)
     end
 
     def build_body(body, options)
-      return unless body
+      body = options[:body] if options.key?(:body)
+
+      return nil unless body
       return body if body.is_a?(String)
 
-      (options[:body] || body).to_json
+      self.class.build_body(self, body, options)
     end
 
     def build_uri(path, query, options)
@@ -382,6 +411,10 @@ module ClientApiBuilder
       else
         data
       end
+    end
+
+    def root_router
+      self
     end
   end
 end

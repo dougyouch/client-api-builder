@@ -24,7 +24,7 @@ def self.#{name}_router
 end
 
 def #{name}
-  @#{name} ||= self.class.#{name}_router.new(self)
+  @#{name} ||= self.class.#{name}_router.new(self.root_router)
 end
 CODE
         self.class_eval code, __FILE__, __LINE__
