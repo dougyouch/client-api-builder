@@ -333,7 +333,7 @@ module ClientApiBuilder
       end
 
       self.class.headers.each(&add_header_proc)
-      options[:headers]&.each(&add_header_proc)
+      options[:headers] && options[:headers].each(&add_header_proc)
 
       headers
     end
@@ -363,8 +363,8 @@ module ClientApiBuilder
       end
 
       self.class.query_params.each(&add_query_param_proc)
-      query&.each(&add_query_param_proc)
-      options[:query]&.each(&add_query_param_proc)
+      query && query.each(&add_query_param_proc)
+      options[:query] && options[:query].each(&add_query_param_proc)
 
       self.class.build_query(query_params)
     end

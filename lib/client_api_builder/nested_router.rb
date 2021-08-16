@@ -79,8 +79,8 @@ module ClientApiBuilder
 
       root_router.class.query_params.each(&add_query_param_proc)
       self.class.query_params.each(&add_query_param_proc)
-      query&.each(&add_query_param_proc)
-      options[:query]&.each(&add_query_param_proc)
+      query && query.each(&add_query_param_proc)
+      options[:query] && options[:query].each(&add_query_param_proc)
 
       self.class.build_query(query_params)
     end
