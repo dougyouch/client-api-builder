@@ -8,7 +8,7 @@ module ClientApiBuilder
       base.extend ClassMethods
       base.include ::ClientApiBuilder::Section
       base.include ::ClientApiBuilder::NetHTTP::Request
-      base.attr_reader :response, :request_options
+      base.send(:attr_reader, :response, :request_options)
     end
 
     module ClassMethods
