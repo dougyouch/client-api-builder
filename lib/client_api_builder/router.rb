@@ -48,16 +48,16 @@ module ClientApiBuilder
         add_value_to_class_method(:default_options, base_url: url)
       end
 
-      def body_builder(builder = nil)
-        return default_options[:body_builder] unless builder
+      def body_builder(builder = nil, &block)
+        return default_options[:body_builder] if builder.nil? && block.nil?
 
-        add_value_to_class_method(:default_options, body_builder: builder)
+        add_value_to_class_method(:default_options, body_builder: builder || block)
       end
 
-      def query_builder(builder = nil)
-        return default_options[:query_builder] unless builder
+      def query_builder(builder = nil, &block)
+        return default_options[:query_builder] if builder.nil? && block.nil?
 
-        add_value_to_class_method(:default_options, query_builder: builder)
+        add_value_to_class_method(:default_options, query_builder: builder || block)
       end
 
       def header(name, value = nil, &block)
@@ -314,7 +314,7 @@ module ClientApiBuilder
       end
     end
 
-    def base_url(options)
+    def base_url(options = {})
       options[:base_url] || self.class.base_url
     end
 
