@@ -30,62 +30,73 @@ module ClientApiBuilder
         }.freeze
       end
 
-
-      def add_response_procs(method_name, proc)
+      # tracks the proc used to handle responses
+      def add_response_proc(method_name, proc)
         response_procs = default_options[:response_procs].dup
         response_procs[method_name] = proc
         add_value_to_class_method(:default_options, response_procs: response_procs)
       end
 
+      # retrieves the proc used to handle the response
       def response_proc(method_name)
-        proc = default_options[:response_procs][method_name]
-        proc
+        default_options[:response_procs][method_name]
       end
 
+      # set/get base url
       def base_url(url = nil)
         return default_options[:base_url] unless url
 
         add_value_to_class_method(:default_options, base_url: url)
       end
 
+      # set the builder to :to_json, :to_query, :query_params or specify a proc to handle building the request body payload
+      # or get the body builder
       def body_builder(builder = nil, &block)
         return default_options[:body_builder] if builder.nil? && block.nil?
 
         add_value_to_class_method(:default_options, body_builder: builder || block)
       end
 
+      # set the builder to :to_query, :query_params or specify a proc to handle building the request query params
+      # or get the query builder
       def query_builder(builder = nil, &block)
         return default_options[:query_builder] if builder.nil? && block.nil?
 
         add_value_to_class_method(:default_options, query_builder: builder || block)
       end
 
+      # set a request header
       def header(name, value = nil, &block)
         headers = default_options[:headers].dup
         headers[name] = value || block
         add_value_to_class_method(:default_options, headers: headers)
       end
 
+      # set a connection_option specific to Net::HTTP
       def connection_option(name, value)
         connection_options = default_options[:connection_options].dup
         connection_options[name] = value
         add_value_to_class_method(:default_options, connection_options: connection_options)
       end
 
+      # set a query param to add to all requests
       def query_param(name, value = nil, &block)
         query_params = default_options[:query_params].dup
         query_params[name] = value || block
         add_value_to_class_method(:default_options, query_params: query_params)
       end
 
+      # get configured headers
       def headers
         default_options[:headers]
       end
 
+      # get configured connection_options
       def connection_options
         default_options[:connection_options]
       end
 
+      # get configured query_params
       def query_params
         default_options[:query_params]
       end
@@ -105,14 +116,14 @@ module ClientApiBuilder
         end
       end
 
-      def build_query(query)
+      def build_query(router, query, options)
         case query_builder
         when :to_query
           query.to_query
         when :query_params
           ClientApiBuilder::QueryParams.to_query(query)
         else
-          query_builder.call(query)
+          router.instance_exec(query, &query_builder)
         end
       end
 
@@ -308,7 +319,7 @@ module ClientApiBuilder
       end
 
       def route(method_name, path, options = {}, &block)
-        add_response_procs(method_name, block) if block
+        add_response_proc(method_name, block) if block
 
         self.class_eval generate_route_code(method_name, path, options), __FILE__, __LINE__
       end
@@ -366,7 +377,7 @@ module ClientApiBuilder
       query && query.each(&add_query_param_proc)
       options[:query] && options[:query].each(&add_query_param_proc)
 
-      self.class.build_query(query_params)
+      self.class.build_query(self, query_params, options)
     end
 
     def build_body(body, options)
