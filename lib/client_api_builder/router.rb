@@ -195,7 +195,7 @@ module ClientApiBuilder
       end
 
       def get_instance_method(var)
-         "#\{#{var}\}"
+         "#\{escape_path(#{var})\}"
       end
 
       @@namespaces = []
@@ -222,7 +222,7 @@ module ClientApiBuilder
         path_arguments = []
         path.gsub!(/:([a-z0-9_]+)/i) do |_|
           path_arguments << $1
-          "#\{#{$1}\}"
+          "#\{escape_path(#{$1})\}"
         end
 
         has_body_param = options[:body].nil? && requires_body?(http_method, options)
@@ -426,6 +426,10 @@ module ClientApiBuilder
 
     def root_router
       self
+    end
+
+    def escape_path(path)
+      path
     end
   end
 end

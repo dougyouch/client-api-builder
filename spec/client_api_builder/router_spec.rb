@@ -155,7 +155,7 @@ describe ClientApiBuilder::Router do
       <<-CODE
 def create_user(app_id:, auth:, name:, email:, **__options__, &block)
   block ||= self.class.response_proc(:create_user)
-  __path__ = "/v2/apps/\#{app_id}/users"
+  __path__ = "/v2/apps/\#{escape_path(app_id)}/users"
   __query__ = {:auth=>auth}
   __body__ = {:user=>{:name=>name, :email=>email}}
   __expected_response_codes__ = []
@@ -184,7 +184,7 @@ CODE
         <<-CODE
 def get_user(app_id:, user_id:, auth:, **__options__, &block)
   block ||= self.class.response_proc(:get_user)
-  __path__ = "/v2/apps/\#{app_id}/users/\#{user_id}"
+  __path__ = "/v2/apps/\#{escape_path(app_id)}/users/\#{escape_path(user_id)}"
   __query__ = {:auth=>auth}
   __body__ = nil
   __expected_response_codes__ = []
@@ -226,7 +226,7 @@ CODE
         <<-CODE
 def get_users(app_id:, **__options__, &block)
   block ||= self.class.response_proc(:get_users)
-  __path__ = "/v2/apps/\#{app_id}/users"
+  __path__ = "/v2/apps/\#{escape_path(app_id)}/users"
   __query__ = nil
   __body__ = nil
   __expected_response_codes__ = ["202"]
@@ -267,7 +267,7 @@ CODE
         <<-CODE
 def delete_user(app_id:, user_id:, **__options__, &block)
   block ||= self.class.response_proc(:delete_user)
-  __path__ = "/v2/apps/\#{app_id}/users/\#{user_id}"
+  __path__ = "/v2/apps/\#{escape_path(app_id)}/users/\#{escape_path(user_id)}"
   __query__ = nil
   __body__ = nil
   __expected_response_codes__ = ["200", "204"]
@@ -341,7 +341,7 @@ CODE
         <<-CODE
 def get_app_users(**__options__, &block)
   block ||= self.class.response_proc(:get_app_users)
-  __path__ = "/v2/apps/\#{app_key}/users"
+  __path__ = "/v2/apps/\#{escape_path(app_key)}/users"
   __query__ = nil
   __body__ = nil
   __expected_response_codes__ = ["200"]
