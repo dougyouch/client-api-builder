@@ -6,9 +6,12 @@ module ClientApiBuilder
     attr_reader :name_value_separator,
                 :param_separator
 
-    def initialize(name_value_separator: '=', param_separator: '&')
+    attr_accessor :custom_escape_proc
+
+    def initialize(name_value_separator: '=', param_separator: '&', custom_escape_proc: nil)
       @name_value_separator = name_value_separator
       @param_separator = param_separator
+      @custom_escape_proc = custom_escape_proc
     end
 
     def to_query(data, namespace = nil)
@@ -64,7 +67,7 @@ module ClientApiBuilder
     end
 
     def escape(str)
-      CGI.escape(str)
+      custom_escape_proc ? custom_escape_proc.call(str) : CGI.escape(str)
     end
   end
 end
