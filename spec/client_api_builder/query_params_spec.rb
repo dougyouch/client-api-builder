@@ -26,6 +26,7 @@ describe ClientApiBuilder::QueryParams do
   let(:namespace) { nil }
   let(:name_value_separator) { '=' }
   let(:param_separator) { '&' }
+  let(:custom_escape_proc) { nil }
 
   let(:expected_query) do
     [
@@ -44,7 +45,7 @@ describe ClientApiBuilder::QueryParams do
   end
 
   context 'to_query' do
-    subject { ClientApiBuilder::QueryParams.new(name_value_separator: name_value_separator, param_separator: param_separator).to_query(data, namespace) }
+    subject { ClientApiBuilder::QueryParams.new(name_value_separator: name_value_separator, param_separator: param_separator, custom_escape_proc: custom_escape_proc).to_query(data, namespace) }
 
     it { is_expected.to eq(expected_query) }
 
@@ -100,6 +101,16 @@ describe ClientApiBuilder::QueryParams do
 
         it { is_expected.to eq(expected_query) }
       end
+    end
+
+    describe 'custom_escape_proc' do
+      let(:custom_escape_proc) { proc { |str| CGI.escape(str).gsub('+', '%20') } }
+
+      let(:data) { 'foo bar' }
+      let(:namespace) { nil }
+      let(:expected_query) { 'foo%20bar' }
+      
+      it { is_expected.to eq(expected_query) }
     end
   end
 end
