@@ -110,7 +110,7 @@ module ClientApiBuilder
         when :to_query
           body.to_query
         when :query_params
-          ClientApiBuilder::QueryParams.to_query(body)
+          ClientApiBuilder::QueryParams.new.to_query(body)
         else
           router.instance_exec(body, &builder)
         end
@@ -121,7 +121,7 @@ module ClientApiBuilder
         when :to_query
           query.to_query
         when :query_params
-          ClientApiBuilder::QueryParams.to_query(query)
+          ClientApiBuilder::QueryParams.new.to_query(query)
         else
           router.instance_exec(query, &query_builder)
         end

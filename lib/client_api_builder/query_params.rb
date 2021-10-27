@@ -2,59 +2,69 @@
 require 'cgi'
 
 module ClientApiBuilder
-  module QueryParams
-    module_function
+  class QueryParams
+    attr_reader :name_value_separator,
+                :param_separator
 
-    def to_query(data, namespace = nil, name_value_separator = '=', param_separator = '&')
+    def initialize(name_value_separator: '=', param_separator: '&')
+      @name_value_separator = name_value_separator
+      @param_separator = param_separator
+    end
+
+    def to_query(data, namespace = nil)
       case data
       when Hash
-        to_query_from_hash(data, (namespace ? CGI.escape(namespace) : nil), name_value_separator).join(param_separator)
+        to_query_from_hash(data, (namespace ? escape(namespace) : nil)).join(param_separator)
       when Array
-        to_query_from_array(data, (namespace ? "#{CGI.escape(namespace)}[]" : '[]'), name_value_separator).join(param_separator)
+        to_query_from_array(data, (namespace ? "#{escape(namespace)}[]" : '[]')).join(param_separator)
       else
         if namespace
-          "#{CGI.escape(namespace)}#{name_value_separator}#{CGI.escape(data.to_s)}"
+          "#{escape(namespace)}#{name_value_separator}#{escape(data.to_s)}"
         else
-          CGI.escape(data.to_s)
+          escape(data.to_s)
         end
       end
     end
 
-    def to_query_from_hash(hsh, namespace, name_value_separator)
+    def to_query_from_hash(hsh, namespace)
       query_params = []
 
       hsh.each do |key, value|
         case value
         when Array
-          array_namespace = namespace ? "#{namespace}[#{CGI.escape(key.to_s)}][]" : "#{CGI.escape(key.to_s)}[]"
-          query_params += to_query_from_array(value, array_namespace, name_value_separator)
+          array_namespace = namespace ? "#{namespace}[#{escape(key.to_s)}][]" : "#{escape(key.to_s)}[]"
+          query_params += to_query_from_array(value, array_namespace)
         when Hash
-          hash_namespace = namespace ? "#{namespace}[#{CGI.escape(key.to_s)}]" : "#{CGI.escape(key.to_s)}"
-          query_params += to_query_from_hash(value, hash_namespace, name_value_separator)
+          hash_namespace = namespace ? "#{namespace}[#{escape(key.to_s)}]" : "#{escape(key.to_s)}"
+          query_params += to_query_from_hash(value, hash_namespace)
         else
-          query_name = namespace ? "#{namespace}[#{CGI.escape(key.to_s)}]" : "#{CGI.escape(key.to_s)}"
-          query_params << "#{query_name}#{name_value_separator}#{CGI.escape(value.to_s)}"
+          query_name = namespace ? "#{namespace}[#{escape(key.to_s)}]" : "#{escape(key.to_s)}"
+          query_params << "#{query_name}#{name_value_separator}#{escape(value.to_s)}"
         end
       end
 
       query_params
     end
 
-    def to_query_from_array(array, namespace, name_value_separator)
+    def to_query_from_array(array, namespace)
       query_params = []
 
       array.each do |value|
         case value
         when Hash
-          query_params += to_query_from_hash(value, namespace, name_value_separator)
+          query_params += to_query_from_hash(value, namespace)
         when Array
-          query_params += to_query_from_array(value, "#{namespace}[]", name_value_separator)
+          query_params += to_query_from_array(value, "#{namespace}[]")
         else
-          query_params << "#{namespace}#{name_value_separator}#{CGI.escape(value.to_s)}"
+          query_params << "#{namespace}#{name_value_separator}#{escape(value.to_s)}"
         end
       end
 
       query_params
+    end
+
+    def escape(str)
+      CGI.escape(str)
     end
   end
 end

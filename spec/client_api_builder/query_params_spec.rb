@@ -44,7 +44,7 @@ describe ClientApiBuilder::QueryParams do
   end
 
   context 'to_query' do
-    subject { ClientApiBuilder::QueryParams.to_query(data, namespace, name_value_separator, param_separator) }
+    subject { ClientApiBuilder::QueryParams.new(name_value_separator: name_value_separator, param_separator: param_separator).to_query(data, namespace) }
 
     it { is_expected.to eq(expected_query) }
 
