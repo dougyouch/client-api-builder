@@ -52,7 +52,7 @@ module ClientApiBuilder
           end
       end
 
-      self.class.headers.each(&add_header_proc)
+      self.class.default_headers.each(&add_header_proc)
 
       headers
     end

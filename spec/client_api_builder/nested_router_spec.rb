@@ -68,7 +68,7 @@ describe ClientApiBuilder::NestedRouter do
       let(:expected_code) do
         <<STR
 def create_session(username:, password:, **__options__, &block)
-  block ||= self.class.response_proc(:create_session)
+  block ||= self.class.get_response_proc(:create_session)
   __path__ = "/sessions"
   __query__ = nil
   __body__ = {:username=>username, :password=>password}

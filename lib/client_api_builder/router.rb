@@ -38,7 +38,7 @@ module ClientApiBuilder
       end
 
       # retrieves the proc used to handle the response
-      def response_proc(method_name)
+      def get_response_proc(method_name)
         default_options[:response_procs][method_name]
       end
 
@@ -86,8 +86,8 @@ module ClientApiBuilder
         add_value_to_class_method(:default_options, query_params: query_params)
       end
 
-      # get configured headers
-      def headers
+      # get default headers
+      def default_headers
         default_options[:headers]
       end
 
@@ -280,7 +280,7 @@ module ClientApiBuilder
         method_args += ['**__options__', '&block']
 
         code = "def #{method_name}(" + method_args.join(', ') + ")\n"
-        code += "  block ||= self.class.response_proc(#{method_name.inspect})\n"
+        code += "  block ||= self.class.get_response_proc(#{method_name.inspect})\n"
         code += "  __path__ = \"#{path}\"\n"
         code += "  __query__ = #{query}\n"
         code += "  __body__ = #{body}\n"
@@ -343,7 +343,7 @@ module ClientApiBuilder
           end
       end
 
-      self.class.headers.each(&add_header_proc)
+      self.class.default_headers.each(&add_header_proc)
       options[:headers] && options[:headers].each(&add_header_proc)
 
       headers

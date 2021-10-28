@@ -46,8 +46,8 @@ describe ClientApiBuilder::Router do
     it { expect(subject).to eq(builder) }
   end
 
-  context '.headers' do
-    subject { router_class.headers }
+  context '.default_headers' do
+    subject { router_class.default_headers }
 
     let(:expected_headers) do
       {
@@ -154,7 +154,7 @@ describe ClientApiBuilder::Router do
     let(:expected_code) do
       <<-CODE
 def create_user(app_id:, auth:, name:, email:, **__options__, &block)
-  block ||= self.class.response_proc(:create_user)
+  block ||= self.class.get_response_proc(:create_user)
   __path__ = "/v2/apps/\#{escape_path(app_id)}/users"
   __query__ = {:auth=>auth}
   __body__ = {:user=>{:name=>name, :email=>email}}
@@ -183,7 +183,7 @@ CODE
       let(:expected_code) do
         <<-CODE
 def get_user(app_id:, user_id:, auth:, **__options__, &block)
-  block ||= self.class.response_proc(:get_user)
+  block ||= self.class.get_response_proc(:get_user)
   __path__ = "/v2/apps/\#{escape_path(app_id)}/users/\#{escape_path(user_id)}"
   __query__ = {:auth=>auth}
   __body__ = nil
@@ -225,7 +225,7 @@ CODE
       let(:expected_code) do
         <<-CODE
 def get_users(app_id:, **__options__, &block)
-  block ||= self.class.response_proc(:get_users)
+  block ||= self.class.get_response_proc(:get_users)
   __path__ = "/v2/apps/\#{escape_path(app_id)}/users"
   __query__ = nil
   __body__ = nil
@@ -266,7 +266,7 @@ CODE
       let(:expected_code) do
         <<-CODE
 def delete_user(app_id:, user_id:, **__options__, &block)
-  block ||= self.class.response_proc(:delete_user)
+  block ||= self.class.get_response_proc(:delete_user)
   __path__ = "/v2/apps/\#{escape_path(app_id)}/users/\#{escape_path(user_id)}"
   __query__ = nil
   __body__ = nil
@@ -309,7 +309,7 @@ CODE
       let(:expected_code) do
         <<-CODE
 def create_app(body:, **__options__, &block)
-  block ||= self.class.response_proc(:create_app)
+  block ||= self.class.get_response_proc(:create_app)
   __path__ = "/v2/apps"
   __query__ = nil
   __body__ = body
@@ -340,7 +340,7 @@ CODE
       let(:expected_code) do
         <<-CODE
 def get_app_users(**__options__, &block)
-  block ||= self.class.response_proc(:get_app_users)
+  block ||= self.class.get_response_proc(:get_app_users)
   __path__ = "/v2/apps/\#{escape_path(app_key)}/users"
   __query__ = nil
   __body__ = nil
