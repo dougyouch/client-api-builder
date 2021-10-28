@@ -65,21 +65,21 @@ module ClientApiBuilder
         add_value_to_class_method(:default_options, query_builder: builder || block)
       end
 
-      # set a request header
+      # add a request header
       def header(name, value = nil, &block)
         headers = default_options[:headers].dup
         headers[name] = value || block
         add_value_to_class_method(:default_options, headers: headers)
       end
 
-      # set a connection_option specific to Net::HTTP
+      # set a connection_option, specific to Net::HTTP
       def connection_option(name, value)
         connection_options = default_options[:connection_options].dup
         connection_options[name] = value
         add_value_to_class_method(:default_options, connection_options: connection_options)
       end
 
-      # set a query param to add to all requests
+      # add a query param to all requests
       def query_param(name, value = nil, &block)
         query_params = default_options[:query_params].dup
         query_params[name] = value || block
@@ -92,12 +92,12 @@ module ClientApiBuilder
       end
 
       # get configured connection_options
-      def connection_options
+      def default_connection_options
         default_options[:connection_options]
       end
 
-      # get configured query_params
-      def query_params
+      # get default query_params to add to all requests
+      def default_query_params
         default_options[:query_params]
       end
 
@@ -351,14 +351,14 @@ module ClientApiBuilder
 
     def build_connection_options(options)
       if options[:connection_options]
-        self.class.connection_options.merge(options[:connection_options])
+        self.class.default_connection_options.merge(options[:connection_options])
       else
-        self.class.connection_options
+        self.class.default_connection_options
       end
     end
 
     def build_query(query, options)
-      return nil if query.nil? && self.class.query_params.empty?
+      return nil if query.nil? && self.class.default_query_params.empty?
 
       query_params = {}
 
@@ -373,7 +373,7 @@ module ClientApiBuilder
           end
       end
 
-      self.class.query_params.each(&add_query_param_proc)
+      self.class.default_query_params.each(&add_query_param_proc)
       query && query.each(&add_query_param_proc)
       options[:query] && options[:query].each(&add_query_param_proc)
 

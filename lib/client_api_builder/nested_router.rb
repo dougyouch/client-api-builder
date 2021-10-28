@@ -62,7 +62,7 @@ module ClientApiBuilder
     end
 
     def build_query(query, options)
-      return nil if query.nil? && root_router.class.query_params.empty? && self.class.query_params.empty?
+      return nil if query.nil? && root_router.class.default_query_params.empty? && self.class.default_query_params.empty?
 
       query_params = {}
 
@@ -77,8 +77,8 @@ module ClientApiBuilder
           end
       end
 
-      root_router.class.query_params.each(&add_query_param_proc)
-      self.class.query_params.each(&add_query_param_proc)
+      root_router.class.default_query_params.each(&add_query_param_proc)
+      self.class.default_query_params.each(&add_query_param_proc)
       query && query.each(&add_query_param_proc)
       options[:query] && options[:query].each(&add_query_param_proc)
 

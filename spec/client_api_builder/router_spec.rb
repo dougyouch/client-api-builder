@@ -73,8 +73,8 @@ describe ClientApiBuilder::Router do
     end
   end
 
-  context '.connection_options' do
-    subject { router_class.connection_options }
+  context '.default_connection_options' do
+    subject { router_class.default_connection_options }
 
     it { expect(subject).to eq(expected_connection_options) }
   end
