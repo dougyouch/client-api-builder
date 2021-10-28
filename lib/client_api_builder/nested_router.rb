@@ -34,8 +34,8 @@ module ClientApiBuilder
       root_router.stream_to_file(**options, &block)
     end
 
-    def base_url(options)
-      self.class.base_url || root_router.base_url(options)
+    def base_url
+      self.class.base_url || root_router.base_url
     end
 
     def build_headers(options)
@@ -95,6 +95,10 @@ module ClientApiBuilder
 
     def handle_response(response, options, &block)
       root_router.handle_response(response, options, &block)
+    end
+
+    def escape_path(path)
+      root_router.escape_path(path)
     end
   end
 end

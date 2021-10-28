@@ -325,8 +325,8 @@ module ClientApiBuilder
       end
     end
 
-    def base_url(options = {})
-      options[:base_url] || self.class.base_url
+    def base_url
+      self.class.base_url
     end
 
     def build_headers(options)
@@ -390,7 +390,7 @@ module ClientApiBuilder
     end
 
     def build_uri(path, query, options)
-      uri = URI(base_url(options) + path)
+      uri = URI(base_url + path)
       uri.query = build_query(query, options)
       uri
     end
