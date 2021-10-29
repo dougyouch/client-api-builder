@@ -79,12 +79,12 @@ describe ClientApiBuilder::Router do
     it { expect(subject).to eq(expected_connection_options) }
   end
 
-  context '.http_method' do
-    it { expect(router_class.http_method('get_user')).to eq(:get) }
-    it { expect(router_class.http_method('create_user')).to eq(:post) }
-    it { expect(router_class.http_method('update_user')).to eq(:put) }
-    it { expect(router_class.http_method('delete_user')).to eq(:delete) }
-   it { expect(router_class.http_method('unknown')).to eq(:get) }
+  context '.auto_detect_http_method' do
+    it { expect(router_class.auto_detect_http_method('get_user')).to eq(:get) }
+    it { expect(router_class.auto_detect_http_method('create_user')).to eq(:post) }
+    it { expect(router_class.auto_detect_http_method('update_user')).to eq(:put) }
+    it { expect(router_class.auto_detect_http_method('delete_user')).to eq(:delete) }
+   it { expect(router_class.auto_detect_http_method('unknown')).to eq(:get) }
   end
 
   context '.get_arguments' do

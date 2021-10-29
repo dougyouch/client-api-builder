@@ -127,7 +127,7 @@ module ClientApiBuilder
         end
       end
 
-      def http_method(method_name)
+      def auto_detect_http_method(method_name)
         case method_name.to_s
         when /^(?:post|create|add|insert)/i
           :post
@@ -210,7 +210,7 @@ module ClientApiBuilder
       end
 
       def generate_route_code(method_name, path, options = {})
-        http_method = options[:method] || http_method(method_name)
+        http_method = options[:method] || auto_detect_http_method(method_name)
 
         path = namespaces.join + path
 
