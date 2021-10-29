@@ -5,6 +5,8 @@ describe ClientApiBuilder::Router do
     Struct.new(:authorization, :request_count, :app_key) do
       include ClientApiBuilder::Router
 
+      attr_accessor :name
+
       connection_option :open_timeout, 100
       base_url 'http://example.com'
       header 'Content-Type', 'application/json'
@@ -106,6 +108,20 @@ describe ClientApiBuilder::Router do
         it { expect(subject).to eq(expected_query) }
       end
     end
+  end
+
+  context '#build_query' do
+    let(:query) { {name: :name, test: proc { 'xyz' }, foo: 'Bar'} }
+    let(:expected_query) { 'name=Mike&test=xyz&foo=Bar' }
+
+    before do
+      router_class.query_builder :query_params
+      router.name = 'Mike'
+    end
+
+    subject { router.build_query(query, {}) }
+
+    it { expect(subject).to eq(expected_query) }
   end
 
   context '.body_builder' do
