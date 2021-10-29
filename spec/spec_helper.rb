@@ -6,6 +6,7 @@ require 'json'
 require 'securerandom'
 require 'simplecov'
 require 'webmock/rspec'
+require 'active_support/core_ext/hash'
 
 SimpleCov.start
 

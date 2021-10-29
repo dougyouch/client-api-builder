@@ -101,10 +101,8 @@ module ClientApiBuilder
         default_options[:query_params]
       end
 
-      def build_body(router, body, options)
-        builder = options[:body_builder] || body_builder
-
-        case builder
+      def build_body(router, body)
+        case body_builder
         when :to_json
           body.to_json
         when :to_query
@@ -112,13 +110,13 @@ module ClientApiBuilder
         when :query_params
           ClientApiBuilder::QueryParams.new.to_query(body)
         when Symbol
-          router.send(builder, body)
+          router.send(body_builder, body)
         else
-          router.instance_exec(body, &builder)
+          router.instance_exec(body_builder, &builder)
         end
       end
 
-      def build_query(router, query, options)
+      def build_query(router, query)
         case query_builder
         when :to_query
           query.to_query
@@ -383,7 +381,7 @@ module ClientApiBuilder
       query && query.each(&add_query_param_proc)
       options[:query] && options[:query].each(&add_query_param_proc)
 
-      self.class.build_query(self, query_params, options)
+      self.class.build_query(self, query_params)
     end
 
     def build_body(body, options)
@@ -392,7 +390,7 @@ module ClientApiBuilder
       return nil unless body
       return body if body.is_a?(String)
 
-      self.class.build_body(self, body, options)
+      self.class.build_body(self, body)
     end
 
     def build_uri(path, query, options)

@@ -82,7 +82,7 @@ module ClientApiBuilder
       query && query.each(&add_query_param_proc)
       options[:query] && options[:query].each(&add_query_param_proc)
 
-      self.class.build_query(self, query_params, options)
+      self.class.build_query(self, query_params)
     end
 
     def build_body(body, options)

@@ -10,6 +10,7 @@ group :development do
 end
 
 group :spec do
+  gem 'activesupport'
   gem 'rspec'
   gem 'simplecov'
   gem 'webmock'

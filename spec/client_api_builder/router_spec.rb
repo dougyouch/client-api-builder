@@ -13,9 +13,23 @@ describe ClientApiBuilder::Router do
       route :create_user, '/users', query: {app_id: :app_id}
 
       namespace '/v2' do
+        route :get_users, '/users'
+
         namespace '/apps' do
           route :get_app_users, '/{app_key}/users'
         end
+      end
+
+      def to_params(data)
+        params = []
+        data.each do |key, value|
+          if value.is_a?(Array)
+            params  << "#{key}=#{value.join(',')}"
+          else
+            params  << "#{key}=#{value}"
+          end
+        end
+        params.join('&')
       end
     end
   end
@@ -44,6 +58,54 @@ describe ClientApiBuilder::Router do
     end
 
     it { expect(subject).to eq(builder) }
+
+    describe 'build query' do
+      let(:query) { {name: 'Foo Bar'} }
+      let(:expected_query) { 'name=Foo+Bar' }
+      subject { router.class.build_query(router, query) }
+
+      it { expect(subject).to eq(expected_query) }
+
+      describe 'query_params' do
+        before do
+          router_class.query_builder :query_params
+        end
+
+        it { expect(subject).to eq(expected_query) }
+      end
+
+      describe 'instance_method' do
+        let(:query) { {name: ['Foo', 'Bar']} }
+        let(:expected_query) { 'name=Foo,Bar' }
+
+        before do
+          router_class.query_builder :to_params
+        end
+
+        it { expect(subject).to eq(expected_query) }
+      end
+
+      describe 'proc' do
+        let(:query) { {name: ['Foo', 'Bar']} }
+        let(:expected_query) { 'name=Foo|Bar' }
+
+        before do
+          router_class.query_builder() do |data|
+            params = []
+            data.each do |key, value|
+              if value.is_a?(Array)
+                params  << "#{key}=#{value.join('|')}"
+              else
+                params  << "#{key}=#{value}"
+              end
+            end
+            params.join('&')
+          end
+        end
+
+        it { expect(subject).to eq(expected_query) }
+      end
+    end
   end
 
   context '.default_headers' do
