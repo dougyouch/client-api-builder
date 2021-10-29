@@ -111,6 +111,8 @@ module ClientApiBuilder
           body.to_query
         when :query_params
           ClientApiBuilder::QueryParams.new.to_query(body)
+        when Symbol
+          router.send(builder, body)
         else
           router.instance_exec(body, &builder)
         end
@@ -122,6 +124,8 @@ module ClientApiBuilder
           query.to_query
         when :query_params
           ClientApiBuilder::QueryParams.new.to_query(query)
+        when Symbol
+          router.send(query_builder, query)
         else
           router.instance_exec(query, &query_builder)
         end
@@ -183,6 +187,7 @@ module ClientApiBuilder
         arguments
       end
 
+      # returns a list of arguments to add to the route method
       def get_arguments(value)
         case value
         when Hash
@@ -203,6 +208,7 @@ module ClientApiBuilder
         @@namespaces
       end
 
+      # a namespace is a top level path to apply to all routes within the namespace block
       def namespace(name)
         namespaces << name
         yield
