@@ -108,6 +108,67 @@ describe ClientApiBuilder::Router do
     end
   end
 
+  context '.body_builder' do
+    let(:builder) { :to_query }
+    subject { router_class.body_builder }
+
+    let(:expected_query_builder) { :to_query }
+
+    before do
+      router_class.body_builder builder
+    end
+
+    it { expect(subject).to eq(builder) }
+
+    describe 'build body' do
+      let(:body) { {name: 'Foo Bar'} }
+      let(:expected_body) { 'name=Foo+Bar' }
+      subject { router.class.build_body(router, body) }
+
+      it { expect(subject).to eq(expected_body) }
+
+      describe 'query_params' do
+        before do
+          router_class.body_builder :query_params
+        end
+
+        it { expect(subject).to eq(expected_body) }
+      end
+
+      describe 'instance_method' do
+        let(:body) { {name: ['Foo', 'Bar']} }
+        let(:expected_body) { 'name=Foo,Bar' }
+
+        before do
+          router_class.body_builder :to_params
+        end
+
+        it { expect(subject).to eq(expected_body) }
+      end
+
+      describe 'proc' do
+        let(:body) { {name: ['Foo', 'Bar']} }
+        let(:expected_body) { 'name=Foo|Bar' }
+
+        before do
+          router_class.body_builder() do |data|
+            params = []
+            data.each do |key, value|
+              if value.is_a?(Array)
+                params  << "#{key}=#{value.join('|')}"
+              else
+                params  << "#{key}=#{value}"
+              end
+            end
+            params.join('&')
+          end
+        end
+
+        it { expect(subject).to eq(expected_body) }
+      end
+    end
+  end
+
   context '.default_headers' do
     subject { router_class.default_headers }
 

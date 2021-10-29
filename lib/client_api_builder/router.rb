@@ -112,7 +112,7 @@ module ClientApiBuilder
         when Symbol
           router.send(body_builder, body)
         else
-          router.instance_exec(body_builder, &builder)
+          router.instance_exec(body, &body_builder)
         end
       end
 
