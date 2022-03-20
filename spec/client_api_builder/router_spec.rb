@@ -292,18 +292,22 @@ describe ClientApiBuilder::Router do
 
     let(:expected_code) do
       <<-CODE
-def create_user(app_id:, auth:, name:, email:, **__options__, &block)
-  block ||= self.class.get_response_proc(:create_user)
+def create_user_raw_response(app_id:, auth:, name:, email:, **__options__, &block)
   __path__ = "/v2/apps/\#{escape_path(app_id)}/users"
   __query__ = {:auth=>auth}
   __body__ = {:user=>{:name=>name, :email=>email}}
-  __expected_response_codes__ = []
   __uri__ = build_uri(__path__, __query__, __options__)
   __body__ = build_body(__body__, __options__)
   __headers__ = build_headers(__options__)
   __connection_options__ = build_connection_options(__options__)
   @request_options = {method: :post, uri: __uri__, body: __body__, headers: __headers__, connection_options: __connection_options__}
   @response = request(**@request_options)
+end
+
+def create_user(app_id:, auth:, name:, email:, **__options__, &block)
+  block ||= self.class.get_response_proc(:create_user)
+  __expected_response_codes__ = []
+  create_user_raw_response(app_id: app_id, auth: auth, name: name, email: email, **__options__, &block)
   expected_response_code!(@response, __expected_response_codes__, __options__)
   handle_response(@response, __options__, &block)
 end
@@ -321,18 +325,22 @@ CODE
 
       let(:expected_code) do
         <<-CODE
-def get_user(app_id:, user_id:, auth:, **__options__, &block)
-  block ||= self.class.get_response_proc(:get_user)
+def get_user_raw_response(app_id:, user_id:, auth:, **__options__, &block)
   __path__ = "/v2/apps/\#{escape_path(app_id)}/users/\#{escape_path(user_id)}"
   __query__ = {:auth=>auth}
   __body__ = nil
-  __expected_response_codes__ = []
   __uri__ = build_uri(__path__, __query__, __options__)
   __body__ = build_body(__body__, __options__)
   __headers__ = build_headers(__options__)
   __connection_options__ = build_connection_options(__options__)
   @request_options = {method: :get, uri: __uri__, body: __body__, headers: __headers__, connection_options: __connection_options__}
   @response = request(**@request_options)
+end
+
+def get_user(app_id:, user_id:, auth:, **__options__, &block)
+  block ||= self.class.get_response_proc(:get_user)
+  __expected_response_codes__ = []
+  get_user_raw_response(app_id: app_id, user_id: user_id, auth: auth, **__options__, &block)
   expected_response_code!(@response, __expected_response_codes__, __options__)
   handle_response(@response, __options__, &block)
 end
@@ -363,18 +371,22 @@ CODE
 
       let(:expected_code) do
         <<-CODE
-def get_users(app_id:, **__options__, &block)
-  block ||= self.class.get_response_proc(:get_users)
+def get_users_raw_response(app_id:, **__options__, &block)
   __path__ = "/v2/apps/\#{escape_path(app_id)}/users"
   __query__ = nil
   __body__ = nil
-  __expected_response_codes__ = ["202"]
   __uri__ = build_uri(__path__, __query__, __options__)
   __body__ = build_body(__body__, __options__)
   __headers__ = build_headers(__options__)
   __connection_options__ = build_connection_options(__options__)
   @request_options = {method: :get, uri: __uri__, body: __body__, headers: __headers__, connection_options: __connection_options__}
   @response = request(**@request_options)
+end
+
+def get_users(app_id:, **__options__, &block)
+  block ||= self.class.get_response_proc(:get_users)
+  __expected_response_codes__ = ["202"]
+  get_users_raw_response(app_id: app_id, **__options__, &block)
   expected_response_code!(@response, __expected_response_codes__, __options__)
   handle_response(@response, __options__, &block)
 end
@@ -404,18 +416,22 @@ CODE
 
       let(:expected_code) do
         <<-CODE
-def delete_user(app_id:, user_id:, **__options__, &block)
-  block ||= self.class.get_response_proc(:delete_user)
+def delete_user_raw_response(app_id:, user_id:, **__options__, &block)
   __path__ = "/v2/apps/\#{escape_path(app_id)}/users/\#{escape_path(user_id)}"
   __query__ = nil
   __body__ = nil
-  __expected_response_codes__ = ["200", "204"]
   __uri__ = build_uri(__path__, __query__, __options__)
   __body__ = build_body(__body__, __options__)
   __headers__ = build_headers(__options__)
   __connection_options__ = build_connection_options(__options__)
   @request_options = {method: :delete, uri: __uri__, body: __body__, headers: __headers__, connection_options: __connection_options__}
   @response = request(**@request_options)
+end
+
+def delete_user(app_id:, user_id:, **__options__, &block)
+  block ||= self.class.get_response_proc(:delete_user)
+  __expected_response_codes__ = ["200", "204"]
+  delete_user_raw_response(app_id: app_id, user_id: user_id, **__options__, &block)
   expected_response_code!(@response, __expected_response_codes__, __options__)
   handle_response(@response, __options__, &block)
 end
@@ -447,18 +463,22 @@ CODE
 
       let(:expected_code) do
         <<-CODE
-def create_app(body:, **__options__, &block)
-  block ||= self.class.get_response_proc(:create_app)
+def create_app_raw_response(body:, **__options__, &block)
   __path__ = "/v2/apps"
   __query__ = nil
   __body__ = body
-  __expected_response_codes__ = ["201"]
   __uri__ = build_uri(__path__, __query__, __options__)
   __body__ = build_body(__body__, __options__)
   __headers__ = build_headers(__options__)
   __connection_options__ = build_connection_options(__options__)
   @request_options = {method: :post, uri: __uri__, body: __body__, headers: __headers__, connection_options: __connection_options__}
   @response = request(**@request_options)
+end
+
+def create_app(body:, **__options__, &block)
+  block ||= self.class.get_response_proc(:create_app)
+  __expected_response_codes__ = ["201"]
+  create_app_raw_response(body: body, **__options__, &block)
   expected_response_code!(@response, __expected_response_codes__, __options__)
   handle_response(@response, __options__, &block)
 end
@@ -478,18 +498,22 @@ CODE
 
       let(:expected_code) do
         <<-CODE
-def get_app_users(**__options__, &block)
-  block ||= self.class.get_response_proc(:get_app_users)
+def get_app_users_raw_response(**__options__, &block)
   __path__ = "/v2/apps/\#{escape_path(app_key)}/users"
   __query__ = nil
   __body__ = nil
-  __expected_response_codes__ = ["200"]
   __uri__ = build_uri(__path__, __query__, __options__)
   __body__ = build_body(__body__, __options__)
   __headers__ = build_headers(__options__)
   __connection_options__ = build_connection_options(__options__)
   @request_options = {method: :get, uri: __uri__, body: __body__, headers: __headers__, connection_options: __connection_options__}
   @response = request(**@request_options)
+end
+
+def get_app_users(**__options__, &block)
+  block ||= self.class.get_response_proc(:get_app_users)
+  __expected_response_codes__ = ["200"]
+  get_app_users_raw_response(**__options__, &block)
   expected_response_code!(@response, __expected_response_codes__, __options__)
   handle_response(@response, __options__, &block)
 end

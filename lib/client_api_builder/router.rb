@@ -283,12 +283,10 @@ module ClientApiBuilder
         method_args += ["#{stream_param}:"] if stream_param
         method_args += ['**__options__', '&block']
 
-        code = "def #{method_name}(" + method_args.join(', ') + ")\n"
-        code += "  block ||= self.class.get_response_proc(#{method_name.inspect})\n"
+        code = "def #{method_name}_raw_response(" + method_args.join(', ') + ")\n"
         code += "  __path__ = \"#{path}\"\n"
         code += "  __query__ = #{query}\n"
         code += "  __body__ = #{body}\n"
-        code += "  __expected_response_codes__ = #{expected_response_codes.inspect}\n"
         code += "  __uri__ = build_uri(__path__, __query__, __options__)\n"
         code += "  __body__ = build_body(__body__, __options__)\n"
         code += "  __headers__ = build_headers(__options__)\n"
@@ -307,7 +305,13 @@ module ClientApiBuilder
         else
           code += "  @response = request(**@request_options)\n"
         end
+        code += "end\n"
+        code += "\n"
 
+        code += "def #{method_name}(" + method_args.join(', ') + ")\n"
+        code += "  block ||= self.class.get_response_proc(#{method_name.inspect})\n"
+        code += "  __expected_response_codes__ = #{expected_response_codes.inspect}\n"
+        code += "  #{method_name}_raw_response(" + method_args.map { |a| a =~ /:$/ ? "#{a} #{a.sub(':', '')}" : a }.join(', ') + ")\n"
         code += "  expected_response_code!(@response, __expected_response_codes__, __options__)\n"
 
         if options[:stream] || options[:return] == :response

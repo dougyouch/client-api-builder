@@ -67,18 +67,22 @@ describe ClientApiBuilder::NestedRouter do
 
       let(:expected_code) do
         <<STR
-def create_session(username:, password:, **__options__, &block)
-  block ||= self.class.get_response_proc(:create_session)
+def create_session_raw_response(username:, password:, **__options__, &block)
   __path__ = "/sessions"
   __query__ = nil
   __body__ = {:username=>username, :password=>password}
-  __expected_response_codes__ = ["201"]
   __uri__ = build_uri(__path__, __query__, __options__)
   __body__ = build_body(__body__, __options__)
   __headers__ = build_headers(__options__)
   __connection_options__ = build_connection_options(__options__)
   @request_options = {method: :post, uri: __uri__, body: __body__, headers: __headers__, connection_options: __connection_options__}
   @response = request(**@request_options)
+end
+
+def create_session(username:, password:, **__options__, &block)
+  block ||= self.class.get_response_proc(:create_session)
+  __expected_response_codes__ = ["201"]
+  create_session_raw_response(username: username, password: password, **__options__, &block)
   expected_response_code!(@response, __expected_response_codes__, __options__)
   handle_response(@response, __options__, &block)
 end
