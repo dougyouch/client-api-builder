@@ -8,10 +8,12 @@ module ClientApiBuilder
   class NestedRouter
     include ::ClientApiBuilder::Router
 
-    attr_reader :root_router
+    attr_reader :root_router,
+                :nested_router_options
 
-    def initialize(root_router)
+    def initialize(root_router, nested_router_options)
       @root_router = root_router
+      @nested_router_options = nested_router_options
     end
 
     def self.get_instance_method(var)
@@ -39,7 +41,7 @@ module ClientApiBuilder
     end
 
     def build_headers(options)
-      headers = root_router.build_headers(options)
+      headers = nested_router_options[:ignore_headers] ? {} : root_router.build_headers(options)
 
       add_header_proc = proc do |name, value|
         headers[name] =
@@ -63,6 +65,7 @@ module ClientApiBuilder
 
     def build_query(query, options)
       return nil if query.nil? && root_router.class.default_query_params.empty? && self.class.default_query_params.empty?
+      return nil if nested_router_options[:ignore_query] && query.nil? && self.class.default_query_params.empty?
 
       query_params = {}
 

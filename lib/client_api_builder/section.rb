@@ -8,7 +8,7 @@ module ClientApiBuilder
     end
 
     module ClassMethods
-      def section(name, &block)
+      def section(name, nested_router_options={}, &block)
         kls = InheritanceHelper::ClassBuilder::Utils.create_class(
           self,
           name,
@@ -24,7 +24,7 @@ def self.#{name}_router
 end
 
 def #{name}
-  @#{name} ||= self.class.#{name}_router.new(self.root_router)
+  @#{name} ||= self.class.#{name}_router.new(self.root_router, #{nested_router_options.inspect})
 end
 CODE
         self.class_eval code, __FILE__, __LINE__

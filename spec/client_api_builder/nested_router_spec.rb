@@ -25,6 +25,16 @@ describe ClientApiBuilder::NestedRouter do
           self.auth_token = res['session']['token']
         end
       end
+
+      section(:auth, ignore_headers: true, ignore_query: true) do
+        connection_option :open_timeout, 1000
+        header 'X-AuthType', 'JSON'
+        base_url 'http://auth.example.com'
+
+        route(:create_session, '/sessions', body: {username: :username, password: :password}, expected_response_code: 201) do |res|
+          self.auth_token = res['session']['token']
+        end
+      end
     end
     kls
   end
@@ -47,12 +57,33 @@ describe ClientApiBuilder::NestedRouter do
        	    'X-Authtype'=>'JSON'
           }).
         to_return(status: 201, body: {session:{token: expected_auth_token}}.to_json, headers: {})
-    end      
+    end
 
     subject { router.login.create_session(username: username, password: password) }
 
     it { expect(subject).to eq(expected_auth_token) }
     it { subject; expect(router.auth_token).to eq(expected_auth_token) }
+
+    describe 'ignore_headers' do
+      let(:expected_auth_token) { SecureRandom.uuid }
+      before do
+        stub_request(:post, "http://auth.example.com/sessions").
+          with(
+            body: "{\"username\":\"#{username}\",\"password\":\"#{password}\"}",
+            headers: {
+              'Accept'=>'*/*',
+              'Accept-Encoding'=>'gzip;q=1.0,deflate;q=0.6,identity;q=0.3',
+              'User-Agent'=>'Ruby',
+              'X-Authtype'=>'JSON'
+            }).
+          to_return(status: 201, body: {session:{token: expected_auth_token}}.to_json, headers: {})
+      end
+
+      subject { router.auth.create_session(username: username, password: password) }
+
+      it { expect(subject).to eq(expected_auth_token) }
+      it { subject; expect(router.auth_token).to eq(expected_auth_token) }
+    end
 
     describe 'code' do
       let(:method_name) { :create_session }
