@@ -11,6 +11,8 @@ class BasicAuthExampleClient < Struct.new(
 
   base_url 'https://www.example.com'
 
+  configure_retries(2)
+
   header 'Authorization', :basic_authorization
   query_param('cache_buster') { (Time.now.to_f * 1000).to_i }
 

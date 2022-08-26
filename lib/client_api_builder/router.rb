@@ -8,7 +8,7 @@ module ClientApiBuilder
       base.extend ClassMethods
       base.include ::ClientApiBuilder::Section
       base.include ::ClientApiBuilder::NetHTTP::Request
-      base.send(:attr_reader, :response, :request_options, :total_time)
+      base.send(:attr_reader, :response, :request_options, :total_request_time, :retry_attempts)
     end
 
     module ClassMethods
@@ -26,7 +26,9 @@ module ClientApiBuilder
           headers: {},
           query_builder: Hash.method_defined?(:to_query) ? :to_query : :query_params,
           query_params: {},
-          response_procs: {}
+          response_procs: {},
+          max_retries: 1,
+          sleep: 0.05
         }.freeze
       end
 
@@ -77,6 +79,14 @@ module ClientApiBuilder
         connection_options = default_options[:connection_options].dup
         connection_options[name] = value
         add_value_to_class_method(:default_options, connection_options: connection_options)
+      end
+
+      def configure_retries(max_retries, sleep_time_between_retries_in_seconds = 0.05)
+        add_value_to_class_method(
+          :default_options,
+          max_retries: max_retries,
+          sleep: sleep_time_between_retries_in_seconds
+        )
       end
 
       # add a query param to all requests
@@ -444,26 +454,30 @@ module ClientApiBuilder
 
     def instrument_request
       start_time = Time.now
-      result = yield
-      @total_time = Time.now - start_time
-      result
+      yield
+    ensure
+      @total_request_time = Time.now - start_time
     end
 
     def retry_request(options)
-      attempts = 0
-      max_attempts = options[:retries] || 1
+      @request_attempts = 0
+      max_attempts = get_retry_request_max_retries(options)
       begin
-        attempts += 1
+        @request_attempts += 1
         yield
       rescue Exception => e
-        raise(e) if attempts >= max_attempts
-        sleep(retry_request_sleep_for(e, options))
+        raise(e) if @request_attempts >= max_attempts
+        sleep(get_retry_request_sleep_time(e, options))
         retry
       end
     end
 
-    def retry_request_sleep_for(e, options)
-      options[:sleep] || 0.05
+    def get_retry_request_sleep_time(e, options)
+      options[:sleep] || self.class.default_options[:sleep] || 0.05
+    end
+
+    def get_retry_request_max_retries(options)
+      options[:retries] || self.class.default_options[:max_retries] || 1
     end
 
     def request_wrapper(options)
