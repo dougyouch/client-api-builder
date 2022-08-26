@@ -11,6 +11,8 @@ module ClientApiBuilder
     end
   end
 
+  autoload :ActiveSupportNotifications, 'client_api_builder/active_support_notifications'
+  autoload :ActiveSupportLogSubscriber, 'client_api_builder/active_support_log_subscriber'
   autoload :NestedRouter, 'client_api_builder/nested_router'
   autoload :QueryParams, 'client_api_builder/query_params'
   autoload :Router, 'client_api_builder/router'
