@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 require 'inheritance-helper'
+require 'json'
 
 module ClientApiBuilder
   module Router
@@ -9,7 +10,7 @@ module ClientApiBuilder
       base.include ::ClientApiBuilder::Section
       base.include ::ClientApiBuilder::NetHTTP::Request
       base.include(::ClientApiBuilder::ActiveSupportNotifications) if defined?(ActiveSupport)
-      base.send(:attr_reader, :response, :request_options, :total_request_time, :retry_attempts)
+      base.send(:attr_reader, :response, :request_options, :total_request_time, :request_attempts)
     end
 
     module ClassMethods

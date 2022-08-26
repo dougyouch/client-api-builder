@@ -1,10 +1,3 @@
-# client-api-builder
-
-Utility for creating API clients through configuration
-
-Example:
-
-```
 class LoremIpsumClient
   include ClientApiBuilder::Router
 
@@ -21,13 +14,3 @@ class LoremIpsumClient
   # this creates a method called create_lorem_ipsum with 2 named arguments amont and what
   route :create_lorem_ipsum, '/feed/json', body: {amount: :amount, what: :what, start: 'yes', generate: 'Generate Lorem Ipsum'}
 end
-```
-
-How to use:
-
-```
-client = LoremIpsumClient.new
-payload = client.create_lorem_ipsum(amount: 10, what: 'words')
-puts payload.dig('feed', 'lipsum')
-# outputs: Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nam at.
-```

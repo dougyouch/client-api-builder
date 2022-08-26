@@ -2,10 +2,10 @@
 
 Gem::Specification.new do |s|
   s.name        = 'client-api-builder'
-  s.version     = '0.3.1'
+  s.version     = '0.4.0'
   s.licenses    = ['MIT']
-  s.summary     = 'Develop Client API libraries faster'
-  s.description = 'Utility for constructing API clients'
+  s.summary     = 'Utility for creating API clients through configuration'
+  s.description = 'Create API clients through configuration with complete transparency'
   s.authors     = ['Doug Youch']
   s.email       = 'dougyouch@gmail.com'
   s.homepage    = 'https://github.com/dougyouch/client-api-builder'
