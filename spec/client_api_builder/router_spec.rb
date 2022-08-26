@@ -305,11 +305,13 @@ def create_user_raw_response(app_id:, auth:, name:, email:, **__options__, &bloc
 end
 
 def create_user(app_id:, auth:, name:, email:, **__options__, &block)
-  block ||= self.class.get_response_proc(:create_user)
-  __expected_response_codes__ = []
-  create_user_raw_response(app_id: app_id, auth: auth, name: name, email: email, **__options__, &block)
-  expected_response_code!(@response, __expected_response_codes__, __options__)
-  handle_response(@response, __options__, &block)
+  request_wrapper(__options__) do
+    block ||= self.class.get_response_proc(:create_user)
+    __expected_response_codes__ = []
+    create_user_raw_response(app_id: app_id, auth: auth, name: name, email: email, **__options__, &block)
+    expected_response_code!(@response, __expected_response_codes__, __options__)
+    handle_response(@response, __options__, &block)
+  end
 end
 CODE
     end
@@ -338,11 +340,13 @@ def get_user_raw_response(app_id:, user_id:, auth:, **__options__, &block)
 end
 
 def get_user(app_id:, user_id:, auth:, **__options__, &block)
-  block ||= self.class.get_response_proc(:get_user)
-  __expected_response_codes__ = []
-  get_user_raw_response(app_id: app_id, user_id: user_id, auth: auth, **__options__, &block)
-  expected_response_code!(@response, __expected_response_codes__, __options__)
-  handle_response(@response, __options__, &block)
+  request_wrapper(__options__) do
+    block ||= self.class.get_response_proc(:get_user)
+    __expected_response_codes__ = []
+    get_user_raw_response(app_id: app_id, user_id: user_id, auth: auth, **__options__, &block)
+    expected_response_code!(@response, __expected_response_codes__, __options__)
+    handle_response(@response, __options__, &block)
+  end
 end
 CODE
       end
@@ -384,11 +388,13 @@ def get_users_raw_response(app_id:, **__options__, &block)
 end
 
 def get_users(app_id:, **__options__, &block)
-  block ||= self.class.get_response_proc(:get_users)
-  __expected_response_codes__ = ["202"]
-  get_users_raw_response(app_id: app_id, **__options__, &block)
-  expected_response_code!(@response, __expected_response_codes__, __options__)
-  handle_response(@response, __options__, &block)
+  request_wrapper(__options__) do
+    block ||= self.class.get_response_proc(:get_users)
+    __expected_response_codes__ = ["202"]
+    get_users_raw_response(app_id: app_id, **__options__, &block)
+    expected_response_code!(@response, __expected_response_codes__, __options__)
+    handle_response(@response, __options__, &block)
+  end
 end
 CODE
       end
@@ -429,11 +435,13 @@ def delete_user_raw_response(app_id:, user_id:, **__options__, &block)
 end
 
 def delete_user(app_id:, user_id:, **__options__, &block)
-  block ||= self.class.get_response_proc(:delete_user)
-  __expected_response_codes__ = ["200", "204"]
-  delete_user_raw_response(app_id: app_id, user_id: user_id, **__options__, &block)
-  expected_response_code!(@response, __expected_response_codes__, __options__)
-  handle_response(@response, __options__, &block)
+  request_wrapper(__options__) do
+    block ||= self.class.get_response_proc(:delete_user)
+    __expected_response_codes__ = ["200", "204"]
+    delete_user_raw_response(app_id: app_id, user_id: user_id, **__options__, &block)
+    expected_response_code!(@response, __expected_response_codes__, __options__)
+    handle_response(@response, __options__, &block)
+  end
 end
 CODE
       end
@@ -476,11 +484,13 @@ def create_app_raw_response(body:, **__options__, &block)
 end
 
 def create_app(body:, **__options__, &block)
-  block ||= self.class.get_response_proc(:create_app)
-  __expected_response_codes__ = ["201"]
-  create_app_raw_response(body: body, **__options__, &block)
-  expected_response_code!(@response, __expected_response_codes__, __options__)
-  handle_response(@response, __options__, &block)
+  request_wrapper(__options__) do
+    block ||= self.class.get_response_proc(:create_app)
+    __expected_response_codes__ = ["201"]
+    create_app_raw_response(body: body, **__options__, &block)
+    expected_response_code!(@response, __expected_response_codes__, __options__)
+    handle_response(@response, __options__, &block)
+  end
 end
 CODE
       end
@@ -511,11 +521,13 @@ def get_app_users_raw_response(**__options__, &block)
 end
 
 def get_app_users(**__options__, &block)
-  block ||= self.class.get_response_proc(:get_app_users)
-  __expected_response_codes__ = ["200"]
-  get_app_users_raw_response(**__options__, &block)
-  expected_response_code!(@response, __expected_response_codes__, __options__)
-  handle_response(@response, __options__, &block)
+  request_wrapper(__options__) do
+    block ||= self.class.get_response_proc(:get_app_users)
+    __expected_response_codes__ = ["200"]
+    get_app_users_raw_response(**__options__, &block)
+    expected_response_code!(@response, __expected_response_codes__, __options__)
+    handle_response(@response, __options__, &block)
+  end
 end
 CODE
       end

@@ -111,11 +111,13 @@ def create_session_raw_response(username:, password:, **__options__, &block)
 end
 
 def create_session(username:, password:, **__options__, &block)
-  block ||= self.class.get_response_proc(:create_session)
-  __expected_response_codes__ = ["201"]
-  create_session_raw_response(username: username, password: password, **__options__, &block)
-  expected_response_code!(@response, __expected_response_codes__, __options__)
-  handle_response(@response, __options__, &block)
+  request_wrapper(__options__) do
+    block ||= self.class.get_response_proc(:create_session)
+    __expected_response_codes__ = ["201"]
+    create_session_raw_response(username: username, password: password, **__options__, &block)
+    expected_response_code!(@response, __expected_response_codes__, __options__)
+    handle_response(@response, __options__, &block)
+  end
 end
 STR
       end

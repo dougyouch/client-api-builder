@@ -8,7 +8,7 @@ module ClientApiBuilder
       base.extend ClassMethods
       base.include ::ClientApiBuilder::Section
       base.include ::ClientApiBuilder::NetHTTP::Request
-      base.send(:attr_reader, :response, :request_options)
+      base.send(:attr_reader, :response, :request_options, :total_time)
     end
 
     module ClassMethods
@@ -309,19 +309,21 @@ module ClientApiBuilder
         code += "\n"
 
         code += "def #{method_name}(" + method_args.join(', ') + ")\n"
-        code += "  block ||= self.class.get_response_proc(#{method_name.inspect})\n"
-        code += "  __expected_response_codes__ = #{expected_response_codes.inspect}\n"
-        code += "  #{method_name}_raw_response(" + method_args.map { |a| a =~ /:$/ ? "#{a} #{a.sub(':', '')}" : a }.join(', ') + ")\n"
-        code += "  expected_response_code!(@response, __expected_response_codes__, __options__)\n"
+        code += "  request_wrapper(__options__) do\n"
+        code += "    block ||= self.class.get_response_proc(#{method_name.inspect})\n"
+        code += "    __expected_response_codes__ = #{expected_response_codes.inspect}\n"
+        code += "    #{method_name}_raw_response(" + method_args.map { |a| a =~ /:$/ ? "#{a} #{a.sub(':', '')}" : a }.join(', ') + ")\n"
+        code += "    expected_response_code!(@response, __expected_response_codes__, __options__)\n"
 
         if options[:stream] || options[:return] == :response
-          code += "  @response\n"
+          code += "    @response\n"
         elsif options[:return] == :body
-          code += "  @response.body\n"
+          code += "    @response.body\n"
         else
-          code += "  handle_response(@response, __options__, &block)\n"
+          code += "    handle_response(@response, __options__, &block)\n"
         end
 
+        code += "  end\n"
         code += "end\n"
         code
       end
@@ -438,6 +440,38 @@ module ClientApiBuilder
 
     def escape_path(path)
       path
+    end
+
+    def instrument_request
+      start_time = Time.now
+      result = yield
+      @total_time = Time.now - start_time
+      result
+    end
+
+    def retry_request(options)
+      attempts = 0
+      max_attempts = options[:retries] || 1
+      begin
+        attempts += 1
+        yield
+      rescue Exception => e
+        raise(e) if attempts >= max_attempts
+        sleep(retry_request_sleep_for(e, options))
+        retry
+      end
+    end
+
+    def retry_request_sleep_for(e, options)
+      options[:sleep] || 0.05
+    end
+
+    def request_wrapper(options)
+      retry_request(options) do
+        instrument_request do
+          yield
+        end
+      end
     end
   end
 end
