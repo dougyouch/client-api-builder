@@ -498,5 +498,14 @@ module ClientApiBuilder
     def log_request_exception(exception)
       ::ClientApiBuilder.logger && ::ClientApiBuilder.logger.error(exception)
     end
+
+    def request_log_message
+      method = request_options[:method].to_s.upcase
+      uri = request_options[:uri]
+      response_code = response ? response.code : 'UNKNOWN'
+
+      duration = (total_request_time * 1000).to_i
+      "#{method} #{uri.scheme}://#{uri.host}#{uri.path}[#{response_code}] took #{duration}ms"
+    end
   end
 end
