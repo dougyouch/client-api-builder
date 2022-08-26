@@ -8,6 +8,7 @@ module ClientApiBuilder
       base.extend ClassMethods
       base.include ::ClientApiBuilder::Section
       base.include ::ClientApiBuilder::NetHTTP::Request
+      base.include(::ClientApiBuilder::ActiveSupportNotifications) if defined?(ActiveSupport)
       base.send(:attr_reader, :response, :request_options, :total_request_time, :retry_attempts)
     end
 
@@ -466,8 +467,10 @@ module ClientApiBuilder
         @request_attempts += 1
         yield
       rescue Exception => e
-        raise(e) if @request_attempts >= max_attempts
-        sleep(get_retry_request_sleep_time(e, options))
+        log_request_exception(e)
+        raise(e) if @request_attempts >= max_attempts || !retry_request?(e, options)
+        sleep_time = get_retry_request_sleep_time(e, options)
+        sleep(sleep_time) if sleep_time && sleep_time > 0
         retry
       end
     end
@@ -486,6 +489,14 @@ module ClientApiBuilder
           yield
         end
       end
+    end
+
+    def retry_request?(exception, options)
+      true
+    end
+
+    def log_request_exception(exception)
+      ::ClientApiBuilder.logger && ::ClientApiBuilder.logger.error(exception)
     end
   end
 end

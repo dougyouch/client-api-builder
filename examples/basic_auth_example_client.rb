@@ -8,7 +8,6 @@ class BasicAuthExampleClient < Struct.new(
 
   include ClientApiBuilder::Router
   include ClientApiBuilder::Section
-  include ClientApiBuilder::ActiveSupportNotifications
 
   base_url 'https://www.example.com'
 
