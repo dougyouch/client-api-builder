@@ -103,9 +103,5 @@ module ClientApiBuilder
     def escape_path(path)
       root_router.escape_path(path)
     end
-
-    def retry_request?(exception)
-      root_router.retry_request?(exception)
-    end
   end
 end
