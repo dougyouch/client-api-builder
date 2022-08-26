@@ -301,12 +301,7 @@ def create_user_raw_response(app_id:, auth:, name:, email:, **__options__, &bloc
   __headers__ = build_headers(__options__)
   __connection_options__ = build_connection_options(__options__)
   @request_options = {method: :post, uri: __uri__, body: __body__, headers: __headers__, connection_options: __connection_options__}
-  begin
-    @response = request(**@request_options)
-  rescue Exception => e
-    retry if retry_request?(e)
-    raise e
-  end
+  @response = request(**@request_options)
 end
 
 def create_user(app_id:, auth:, name:, email:, **__options__, &block)
@@ -339,12 +334,7 @@ def get_user_raw_response(app_id:, user_id:, auth:, **__options__, &block)
   __headers__ = build_headers(__options__)
   __connection_options__ = build_connection_options(__options__)
   @request_options = {method: :get, uri: __uri__, body: __body__, headers: __headers__, connection_options: __connection_options__}
-  begin
-    @response = request(**@request_options)
-  rescue Exception => e
-    retry if retry_request?(e)
-    raise e
-  end
+  @response = request(**@request_options)
 end
 
 def get_user(app_id:, user_id:, auth:, **__options__, &block)
@@ -390,12 +380,7 @@ def get_users_raw_response(app_id:, **__options__, &block)
   __headers__ = build_headers(__options__)
   __connection_options__ = build_connection_options(__options__)
   @request_options = {method: :get, uri: __uri__, body: __body__, headers: __headers__, connection_options: __connection_options__}
-  begin
-    @response = request(**@request_options)
-  rescue Exception => e
-    retry if retry_request?(e)
-    raise e
-  end
+  @response = request(**@request_options)
 end
 
 def get_users(app_id:, **__options__, &block)
@@ -440,12 +425,7 @@ def delete_user_raw_response(app_id:, user_id:, **__options__, &block)
   __headers__ = build_headers(__options__)
   __connection_options__ = build_connection_options(__options__)
   @request_options = {method: :delete, uri: __uri__, body: __body__, headers: __headers__, connection_options: __connection_options__}
-  begin
-    @response = request(**@request_options)
-  rescue Exception => e
-    retry if retry_request?(e)
-    raise e
-  end
+  @response = request(**@request_options)
 end
 
 def delete_user(app_id:, user_id:, **__options__, &block)
@@ -492,12 +472,7 @@ def create_app_raw_response(body:, **__options__, &block)
   __headers__ = build_headers(__options__)
   __connection_options__ = build_connection_options(__options__)
   @request_options = {method: :post, uri: __uri__, body: __body__, headers: __headers__, connection_options: __connection_options__}
-  begin
-    @response = request(**@request_options)
-  rescue Exception => e
-    retry if retry_request?(e)
-    raise e
-  end
+  @response = request(**@request_options)
 end
 
 def create_app(body:, **__options__, &block)
@@ -532,12 +507,7 @@ def get_app_users_raw_response(**__options__, &block)
   __headers__ = build_headers(__options__)
   __connection_options__ = build_connection_options(__options__)
   @request_options = {method: :get, uri: __uri__, body: __body__, headers: __headers__, connection_options: __connection_options__}
-  begin
-    @response = request(**@request_options)
-  rescue Exception => e
-    retry if retry_request?(e)
-    raise e
-  end
+  @response = request(**@request_options)
 end
 
 def get_app_users(**__options__, &block)

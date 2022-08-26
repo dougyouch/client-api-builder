@@ -293,23 +293,18 @@ module ClientApiBuilder
         code += "  __connection_options__ = build_connection_options(__options__)\n"
         code += "  @request_options = {method: #{http_method.inspect}, uri: __uri__, body: __body__, headers: __headers__, connection_options: __connection_options__}\n"
         code += "  @request_options[:#{stream_param}] = #{stream_param}\n" if stream_param
-        code += "  begin\n"
 
         case options[:stream]
         when true,
              :file
-          code += "    @response = stream_to_file(**@request_options)\n"
+          code += "  @response = stream_to_file(**@request_options)\n"
         when :io
-          code += "    @response = stream_to_io(**@request_options)\n"
+          code += "  @response = stream_to_io(**@request_options)\n"
         when :block
-          code += "    @response = stream(**@request_options, &block)\n"
+          code += "  @response = stream(**@request_options, &block)\n"
         else
-          code += "    @response = request(**@request_options)\n"
+          code += "  @response = request(**@request_options)\n"
         end
-        code += "  rescue Exception => e\n"
-        code += "    retry if retry_request?(e)\n"
-        code += "    raise e\n"
-        code += "  end\n"
         code += "end\n"
         code += "\n"
 
@@ -443,10 +438,6 @@ module ClientApiBuilder
 
     def escape_path(path)
       path
-    end
-
-    def retry_request?(exception)
-      false
     end
   end
 end

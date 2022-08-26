@@ -107,12 +107,7 @@ def create_session_raw_response(username:, password:, **__options__, &block)
   __headers__ = build_headers(__options__)
   __connection_options__ = build_connection_options(__options__)
   @request_options = {method: :post, uri: __uri__, body: __body__, headers: __headers__, connection_options: __connection_options__}
-  begin
-    @response = request(**@request_options)
-  rescue Exception => e
-    retry if retry_request?(e)
-    raise e
-  end
+  @response = request(**@request_options)
 end
 
 def create_session(username:, password:, **__options__, &block)
