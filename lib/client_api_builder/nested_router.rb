@@ -20,22 +20,6 @@ module ClientApiBuilder
       "\#{root_router.#{var}\}"
     end
 
-    def request(**options, &block)
-      root_router.request(**options, &block)
-    end
-
-    def stream(**options, &block)
-      root_router.stream(**options, &block)
-    end
-
-    def stream_to_io(**options, &block)
-      root_router.stream_to_io(**options, &block)
-    end
-
-    def stream_to_file(**options, &block)
-      root_router.stream_to_file(**options, &block)
-    end
-
     def base_url
       self.class.base_url || root_router.base_url
     end

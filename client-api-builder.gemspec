@@ -2,7 +2,7 @@
 
 Gem::Specification.new do |s|
   s.name        = 'client-api-builder'
-  s.version     = '0.5.0'
+  s.version     = '0.5.1'
   s.licenses    = ['MIT']
   s.summary     = 'Utility for creating API clients through configuration'
   s.description = 'Create API clients through configuration with complete transparency'
