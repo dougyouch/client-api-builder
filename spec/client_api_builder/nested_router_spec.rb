@@ -17,6 +17,7 @@ describe ClientApiBuilder::NestedRouter do
 
       section :login do
         connection_option :open_timeout, 1000
+        header 'Content-Type', 'application/json'
         header 'X-AuthType', 'JSON'
         base_url 'http://login.example.com'
         query_param 'cachebuster', 5
@@ -28,6 +29,7 @@ describe ClientApiBuilder::NestedRouter do
 
       section(:auth, ignore_headers: true, ignore_query: true) do
         connection_option :open_timeout, 1000
+        header 'Content-Type', 'application/json'
         header 'X-AuthType', 'JSON'
         base_url 'http://auth.example.com'
 

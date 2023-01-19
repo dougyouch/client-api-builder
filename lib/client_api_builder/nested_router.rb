@@ -40,68 +40,8 @@ module ClientApiBuilder
       self.class.base_url || root_router.base_url
     end
 
-    def build_headers(options)
-      headers = nested_router_options[:ignore_headers] ? {} : root_router.build_headers(options)
-
-      add_header_proc = proc do |name, value|
-        headers[name] =
-          if value.is_a?(Proc)
-            root_router.instance_eval(&value)
-          elsif value.is_a?(Symbol)
-            root_router.send(value)
-          else
-            value
-          end
-      end
-
-      self.class.default_headers.each(&add_header_proc)
-
-      headers
-    end
-
-    def build_connection_options(options)
-      root_router.build_connection_options(options)
-    end
-
-    def build_query(query, options)
-      return nil if query.nil? && root_router.class.default_query_params.empty? && self.class.default_query_params.empty?
-      return nil if nested_router_options[:ignore_query] && query.nil? && self.class.default_query_params.empty?
-
-      query_params = {}
-
-      add_query_param_proc = proc do |name, value|
-        query_params[name] =
-          if value.is_a?(Proc)
-            root_router.instance_eval(&value)
-          elsif value.is_a?(Symbol)
-            root_router.send(value)
-          else
-            value
-          end
-      end
-
-      root_router.class.default_query_params.each(&add_query_param_proc)
-      self.class.default_query_params.each(&add_query_param_proc)
-      query && query.each(&add_query_param_proc)
-      options[:query] && options[:query].each(&add_query_param_proc)
-
-      self.class.build_query(self, query_params)
-    end
-
-    def build_body(body, options)
-      root_router.build_body(body, options)
-    end
-
-    def expected_response_code!(response, expected_response_codes, options)
-      root_router.expected_response_code!(response, expected_response_codes, options)
-    end
-
     def handle_response(response, options, &block)
       root_router.handle_response(response, options, &block)
-    end
-
-    def escape_path(path)
-      root_router.escape_path(path)
     end
   end
 end
