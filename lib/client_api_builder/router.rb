@@ -357,9 +357,9 @@ module ClientApiBuilder
       add_header_proc = proc do |name, value|
         headers[name] =
           if value.is_a?(Proc)
-            instance_eval(&value)
+            root_router.instance_eval(&value)
           elsif value.is_a?(Symbol)
-            send(value)
+            root_router.send(value)
           else
             value
           end
@@ -385,9 +385,9 @@ module ClientApiBuilder
       add_query_param_proc = proc do |name, value|
         query_params[name] =
           if value.is_a?(Proc)
-            instance_eval(&value)
+            root_router.instance_eval(&value)
           elsif value.is_a?(Symbol)
-            send(value)
+            root_router.send(value)
           else
             value
           end
