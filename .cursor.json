@@ -1,0 +1,29 @@
+{
+  "rules": [
+    {
+      "name": "Ruby spec file",
+      "pattern": "^lib/(.+)\\.rb$",
+      "target": "spec/${1}_spec.rb"
+    },
+    {
+      "name": "Ruby implementation file",
+      "pattern": "^spec/(.+)_spec\\.rb$", 
+      "target": "lib/${1}.rb"
+    },
+    {
+      "name": "Related client_api_builder files",
+      "pattern": "^(?:lib|spec)/client_api_builder/(.+)\\.rb$",
+      "related": [
+        "lib/client_api_builder/${1}.rb",
+        "spec/client_api_builder/${1}_spec.rb"
+      ]
+    },
+    {
+      "name": "Main library file",
+      "pattern": "^(?:lib|spec)/client_api_builder/.+\\.rb$",
+      "related": [
+        "lib/client-api-builder.rb"
+      ]
+    }
+  ]
+} 
