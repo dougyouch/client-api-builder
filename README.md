@@ -87,7 +87,7 @@ class MyApiClient
   
   base_url 'https://api.example.com'
   
-  nested_route :users do
+  section :users do
     route :list, '/', method: :get
     route :get, '/:id', method: :get
   end
