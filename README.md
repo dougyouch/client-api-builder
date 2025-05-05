@@ -1,33 +1,143 @@
-# client-api-builder
+# Client API Builder
 
-Utility for creating API clients through configuration
+A Ruby gem that provides a simple and elegant way to create API clients through configuration. It allows you to define API endpoints and their behavior declaratively, making it easy to create and maintain API clients.
 
-Example:
+## Features
 
+- Declarative API client configuration
+- Support for different request body formats (JSON, query params)
+- Customizable headers
+- Nested routing support
+- ActiveSupport integration for logging and notifications
+- Error handling with detailed response information
+- Flexible parameter handling
+
+## Installation
+
+Add this line to your application's Gemfile:
+
+```ruby
+gem 'client-api-builder'
 ```
-class LoremIpsumClient
+
+And then execute:
+
+```bash
+$ bundle install
+```
+
+Or install it yourself as:
+
+```bash
+$ gem install client-api-builder
+```
+
+## Usage
+
+### Basic Usage
+
+Create an API client by including the `ClientApiBuilder::Router` module and defining your endpoints:
+
+```ruby
+class MyApiClient
   include ClientApiBuilder::Router
 
-  # by default it converts the body data to JSON
-  # to convert the body to query params (x=1&y=2) use the following
-  # if using active support change this to :to_query
-  body_builder :query_params
+  # Set the base URL for all requests
+  base_url 'https://api.example.com'
 
-  base_url 'https://www.lipsum.com'
-
-  header 'Content-Type', 'application/x-www-form-urlencoded'
+  # Set default headers
+  header 'Content-Type', 'application/json'
   header 'Accept', 'application/json'
 
-  # this creates a method called create_lorem_ipsum with 2 named arguments amont and what
-  route :create_lorem_ipsum, '/feed/json', body: {amount: :amount, what: :what, start: 'yes', generate: 'Generate Lorem Ipsum'}
+  # Define an endpoint
+  route :get_user, '/users/:id', method: :get
+  route :create_user, '/users', method: :post, body: { name: :name, email: :email }
+end
+
+# Use the client
+client = MyApiClient.new
+user = client.get_user(id: 123)
+new_user = client.create_user(name: 'John', email: 'john@example.com')
+```
+
+### Request Body Formats
+
+By default, the client converts the body data to JSON. To use query parameters instead:
+
+```ruby
+class MyApiClient
+  include ClientApiBuilder::Router
+  
+  # Use query parameters for the body
+  body_builder :query_params
+  
+  base_url 'https://api.example.com'
+  
+  route :search, '/search', body: { q: :query, page: :page }
 end
 ```
 
-How to use:
+### Nested Routing
 
+For APIs with nested resources, you can use the `NestedRouter`:
+
+```ruby
+class MyApiClient
+  include ClientApiBuilder::Router
+  
+  base_url 'https://api.example.com'
+  
+  nested_route :users do
+    route :list, '/', method: :get
+    route :get, '/:id', method: :get
+  end
+end
+
+client = MyApiClient.new
+users = client.users.list
+user = client.users.get(id: 123)
 ```
-client = LoremIpsumClient.new
-payload = client.create_lorem_ipsum(amount: 10, what: 'words')
-puts payload.dig('feed', 'lipsum')
-# outputs: Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nam at.
+
+### Error Handling
+
+The gem provides custom error classes for better error handling:
+
+```ruby
+begin
+  client.get_user(id: 123)
+rescue ClientApiBuilder::UnexpectedResponse => e
+  puts "Request failed with status #{e.response.status}"
+  puts "Response body: #{e.response.body}"
+end
 ```
+
+### ActiveSupport Integration
+
+The gem integrates with ActiveSupport for logging and notifications:
+
+```ruby
+# Enable logging
+ClientApiBuilder.logger = Logger.new(STDOUT)
+
+# Subscribe to notifications
+ActiveSupport::Notifications.subscribe('request.client_api_builder') do |*args|
+  event = ActiveSupport::Notifications::Event.new(*args)
+  puts "Request took #{event.duration}ms"
+end
+```
+
+## Configuration Options
+
+- `base_url`: Set the base URL for all requests
+- `header`: Add headers to all requests
+- `body_builder`: Configure how request bodies are formatted
+- `route`: Define API endpoints with their paths and parameters
+- `nested_route`: Define nested resource routes
+
+## Contributing
+
+Bug reports and pull requests are welcome on GitHub at https://github.com/dougyouch/client-api-builder.
+
+## License
+
+The gem is available as open source under the terms of the [MIT License](https://opensource.org/licenses/MIT).
