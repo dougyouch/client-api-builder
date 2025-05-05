@@ -260,7 +260,7 @@ The response and request options are maintained until the next request is made, 
 - `header`: Add headers to all requests
 - `body_builder`: Configure how request bodies are formatted
 - `route`: Define API endpoints with their paths and parameters
-- `nested_route`: Define nested resource routes
+- `section`: Define nested resource routes
 
 ## Contributing
 
