@@ -12,6 +12,7 @@ A Ruby gem that provides a simple and elegant way to create API clients through 
 - Error handling with detailed response information
 - Flexible parameter handling
 - Automatic HTTP method detection based on method names
+- Streaming support for handling large payloads
 
 ## Installation
 
@@ -155,6 +156,40 @@ ActiveSupport::Notifications.subscribe('request.client_api_builder') do |*args|
   puts "Request took #{event.duration}ms"
 end
 ```
+
+### Streaming Support
+
+The library supports streaming responses, which is particularly useful for handling large payloads. You can stream responses directly to a file or process them in chunks:
+
+```ruby
+class MyApiClient
+  include ClientApiBuilder::Router
+  
+  base_url 'https://api.example.com'
+  
+  # Stream response directly to a file
+  route :download_users, '/users', stream: :file
+  
+  # Stream response in chunks for custom processing
+  route :stream_users, '/users', stream: true
+end
+
+# Use the client
+client = MyApiClient.new
+
+# Stream to file
+client.download_users('users.json')  # Saves response directly to users.json
+
+# Stream with custom processing
+client.stream_users do |chunk|
+  # Process each chunk of the response
+  puts "Received #{chunk.bytesize} bytes"
+end
+```
+
+When using `stream: :file`, the response is written directly to disk as it's received, which is memory-efficient for large responses. The file path is passed as an argument to the method.
+
+For custom streaming, you can provide a block that will be called with each chunk of the response as it's received. This allows for custom processing of large responses without loading the entire response into memory.
 
 ## Configuration Options
 
