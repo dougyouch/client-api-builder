@@ -147,6 +147,8 @@ module ClientApiBuilder
           :post
         when /^(?:put|update|modify|change)/i
           :put
+        when /^(?:patch)/i
+          :patch
         when /^(?:delete|remove)/i
           :delete
         else

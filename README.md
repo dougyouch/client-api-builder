@@ -11,6 +11,7 @@ A Ruby gem that provides a simple and elegant way to create API clients through 
 - ActiveSupport integration for logging and notifications
 - Error handling with detailed response information
 - Flexible parameter handling
+- Automatic HTTP method detection based on method names
 
 ## Installation
 
@@ -50,14 +51,43 @@ class MyApiClient
   header 'Accept', 'application/json'
 
   # Define an endpoint
-  route :get_user, '/users/:id', method: :get
-  route :create_user, '/users', method: :post, body: { name: :name, email: :email }
+  route :get_user, '/users/:id', method: :get, expected_response_code: 200
+  route :create_user, '/users', method: :post, expected_response_code: 201, body: { name: :name, email: :email }
 end
 
 # Use the client
 client = MyApiClient.new
 user = client.get_user(id: 123)
 new_user = client.create_user(name: 'John', email: 'john@example.com')
+```
+
+### Automatic HTTP Method Detection
+
+The Router automatically detects the HTTP method based on the method name if not explicitly specified. This makes your API client code more intuitive and reduces boilerplate. The detection rules are:
+
+- Methods starting with `post`, `create`, `add`, or `insert` → `POST`
+- Methods starting with `put`, `update`, `modify`, or `change` → `PUT`
+- Methods starting with `patch` → `PATCH`
+- Methods starting with `delete` or `remove` → `DELETE`
+- All other methods → `GET`
+
+Example:
+
+```ruby
+class MyApiClient
+  include ClientApiBuilder::Router
+  
+  base_url 'https://api.example.com'
+  
+  # These will automatically use the appropriate HTTP methods
+  route :get_users, '/users'  # Uses GET
+  route :create_user, '/users', body: { name: :name }  # Uses POST
+  route :update_user, '/users/:id', body: { name: :name }  # Uses PUT
+  route :delete_user, '/users/:id'  # Uses DELETE
+  
+  # You can still explicitly specify the method if needed
+  route :custom_action, '/custom', method: :post
+end
 ```
 
 ### Request Body Formats
