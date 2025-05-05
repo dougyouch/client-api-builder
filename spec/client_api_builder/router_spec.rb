@@ -223,7 +223,8 @@ describe ClientApiBuilder::Router do
     it { expect(router_class.auto_detect_http_method('create_user')).to eq(:post) }
     it { expect(router_class.auto_detect_http_method('update_user')).to eq(:put) }
     it { expect(router_class.auto_detect_http_method('delete_user')).to eq(:delete) }
-   it { expect(router_class.auto_detect_http_method('unknown')).to eq(:get) }
+    it { expect(router_class.auto_detect_http_method('patch_user')).to eq(:patch) }
+    it { expect(router_class.auto_detect_http_method('unknown')).to eq(:get) }
   end
 
   context '.get_arguments' do
