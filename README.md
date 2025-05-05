@@ -13,6 +13,7 @@ A Ruby gem that provides a simple and elegant way to create API clients through 
 - Flexible parameter handling
 - Automatic HTTP method detection based on method names
 - Streaming support for handling large payloads
+- Built-in debugging capabilities
 
 ## Installation
 
@@ -190,6 +191,68 @@ end
 When using `stream: :file`, the response is written directly to disk as it's received, which is memory-efficient for large responses. The file path is passed as an argument to the method.
 
 For custom streaming, you can provide a block that will be called with each chunk of the response as it's received. This allows for custom processing of large responses without loading the entire response into memory.
+
+### Thread Safety
+
+The library is not thread-safe. You must create a separate client instance per thread to avoid race conditions and ensure proper operation:
+
+```ruby
+# Correct: Create a new client for each thread
+threads = []
+5.times do |i|
+  threads << Thread.new do
+    client = MyApiClient.new
+    client.get_user(id: i)
+  end
+end
+threads.each(&:join)
+
+# Incorrect: Do not share a single client across threads
+client = MyApiClient.new
+threads = []
+5.times do |i|
+  threads << Thread.new do
+    client.get_user(id: i)  # This will cause race conditions
+  end
+end
+threads.each(&:join)
+```
+
+Each client instance maintains its own state, including response objects and request options. Sharing a client across threads can lead to unpredictable behavior and race conditions.
+
+### Debugging
+
+The Router provides built-in debugging capabilities by maintaining the response object and request options for each request. This information can be accessed after making a request:
+
+```ruby
+client = MyApiClient.new
+client.get_user(id: 123)
+
+# Access the last response
+response = client.response
+puts "Status: #{response.status}"
+puts "Headers: #{response.headers}"
+puts "Body: #{response.body}"
+
+# Access the request options used
+request_options = client.request_options
+puts "Method: #{request_options[:method]}"
+puts "URL: #{request_options[:url]}"
+puts "Headers: #{request_options[:headers]}"
+puts "Body: #{request_options[:body]}"
+
+# Access timing information
+puts "Total request time: #{client.total_request_time} seconds"
+puts "Number of attempts: #{client.request_attempts}"
+```
+
+This information is particularly useful for:
+- Debugging failed requests
+- Understanding request/response cycles
+- Performance analysis
+- Logging and monitoring
+
+The response and request options are maintained until the next request is made, so you can inspect them immediately after a request completes.
 
 ## Configuration Options
 
