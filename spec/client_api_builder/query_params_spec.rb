@@ -113,6 +113,24 @@ describe ClientApiBuilder::QueryParams do
       let(:expected_query) { 'foo%20bar' }
 
       it { is_expected.to eq(expected_query) }
+
+      describe 'with invalid return type' do
+        let(:custom_escape_proc) { proc { |_str| 123 } }
+        let(:data) { 'test' }
+
+        it 'raises TypeError when proc returns non-String' do
+          expect { subject }.to raise_error(TypeError, /must return a String/)
+        end
+      end
+
+      describe 'with nil return' do
+        let(:custom_escape_proc) { proc { |_str| } }
+        let(:data) { 'test' }
+
+        it 'raises TypeError when proc returns nil' do
+          expect { subject }.to raise_error(TypeError, /must return a String/)
+        end
+      end
     end
   end
 end
