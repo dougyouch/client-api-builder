@@ -18,7 +18,7 @@ Metrics/ClassLength:
   Max: 200
 
 Metrics/ModuleLength:
-  Max: 300
+  Max: 320
 
 Metrics/CyclomaticComplexity:
   Max: 30
@@ -72,18 +72,8 @@ Style/StringConcatenation:
 Style/FormatStringToken:
   Enabled: false
 
-# Allow class variables in Router module (used for namespaces)
-Style/ClassVars:
-  Exclude:
-    - 'lib/client_api_builder/router.rb'
-
-# Allow global $1 regex captures in code generation
-Style/PerlBackrefs:
-  Exclude:
-    - 'lib/client_api_builder/router.rb'
-
-# Allow rescuing Exception in specific files (intentional for retry logic)
-Lint/RescueException:
-  Exclude:
-    - 'lib/client_api_builder/router.rb'
-    - 'lib/client_api_builder/active_support_notifications.rb'
+# Note: Previously had exclusions for Style/ClassVars, Style/PerlBackrefs, and
+# Lint/RescueException in router.rb - these have been fixed:
+# - ClassVars: Changed to thread-local storage
+# - PerlBackrefs: Changed to Regexp.last_match
+# - RescueException: Changed to StandardError

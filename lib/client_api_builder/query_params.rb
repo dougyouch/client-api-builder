@@ -68,7 +68,12 @@ module ClientApiBuilder
     end
 
     def escape(str)
-      custom_escape_proc ? custom_escape_proc.call(str) : CGI.escape(str)
+      return CGI.escape(str) unless custom_escape_proc
+
+      result = custom_escape_proc.call(str)
+      raise TypeError, "custom_escape_proc must return a String, got #{result.class}" unless result.is_a?(String)
+
+      result
     end
   end
 end

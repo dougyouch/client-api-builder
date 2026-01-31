@@ -21,6 +21,20 @@ module ClientApiBuilder
         patch
       ].freeze
 
+      # Allowed URL schemes for base_url to prevent SSRF attacks
+      ALLOWED_URL_SCHEMES = %w[http https].freeze
+
+      # Deep duplicates a hash to prevent shared mutable state
+      def deep_dup_hash(hash)
+        hash.transform_values do |value|
+          case value
+          when Hash then deep_dup_hash(value)
+          when Array then value.map { |v| v.is_a?(Hash) ? deep_dup_hash(v) : v }
+          else value
+          end
+        end
+      end
+
       def default_options
         {
           base_url: nil,
@@ -37,7 +51,7 @@ module ClientApiBuilder
 
       # tracks the proc used to handle responses
       def add_response_proc(method_name, proc)
-        response_procs = default_options[:response_procs].dup
+        response_procs = deep_dup_hash(default_options[:response_procs])
         response_procs[method_name] = proc
         add_value_to_class_method(:default_options, response_procs: response_procs)
       end
@@ -48,10 +62,22 @@ module ClientApiBuilder
       end
 
       # set/get base url
+      # Validates URL scheme to prevent SSRF attacks
       def base_url(url = nil)
         return default_options[:base_url] unless url
 
+        validate_base_url!(url)
         add_value_to_class_method(:default_options, base_url: url)
+      end
+
+      # Validates that base_url uses an allowed scheme
+      def validate_base_url!(url)
+        uri = URI.parse(url.to_s)
+        return if ALLOWED_URL_SCHEMES.include?(uri.scheme&.downcase)
+
+        raise ArgumentError, "Invalid base_url scheme: #{uri.scheme.inspect}. Allowed: #{ALLOWED_URL_SCHEMES.join(', ')}"
+      rescue URI::InvalidURIError => e
+        raise ArgumentError, "Invalid base_url: #{e.message}"
       end
 
       # set the builder to :to_json, :to_query, :query_params or specify a proc to handle building the request body payload
@@ -72,14 +98,14 @@ module ClientApiBuilder
 
       # add a request header
       def header(name, value = nil, &block)
-        headers = default_options[:headers].dup
+        headers = deep_dup_hash(default_options[:headers])
         headers[name] = value || block
         add_value_to_class_method(:default_options, headers: headers)
       end
 
       # set a connection_option, specific to Net::HTTP
       def connection_option(name, value)
-        connection_options = default_options[:connection_options].dup
+        connection_options = deep_dup_hash(default_options[:connection_options])
         connection_options[name] = value
         add_value_to_class_method(:default_options, connection_options: connection_options)
       end
@@ -94,7 +120,7 @@ module ClientApiBuilder
 
       # add a query param to all requests
       def query_param(name, value = nil, &block)
-        query_params = default_options[:query_params].dup
+        query_params = deep_dup_hash(default_options[:query_params])
         query_params[name] = value || block
         add_value_to_class_method(:default_options, query_params: query_params)
       end
