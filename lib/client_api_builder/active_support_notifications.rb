@@ -11,11 +11,13 @@ module ClientApiBuilder
       result = nil
       ActiveSupport::Notifications.instrument('client_api_builder.request', client: self) do
         result = yield
-      rescue Exception => e
+      rescue StandardError => e
+        # Use StandardError instead of Exception to allow SystemExit, Interrupt, etc. to propagate
         error = e
       end
 
-      raise(error) if error
+      # Re-raise with original backtrace preserved
+      raise(error, error.message, error.backtrace) if error
 
       result
     ensure

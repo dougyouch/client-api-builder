@@ -176,7 +176,10 @@ module ClientApiBuilder
           when Array
             arguments += get_array_arguments(v)
           when String
-            hsh[k] = "__||#{$1}||__" if v =~ /\{([a-z0-9_]+)\}/i
+            # Use match with block form to avoid thread-unsafe $1 global variable
+            if (match = v.match(/\{([a-z0-9_]+)\}/i))
+              hsh[k] = "__||#{match[1]}||__"
+            end
           end
         end
         arguments
@@ -194,7 +197,10 @@ module ClientApiBuilder
           when Array
             arguments += get_array_arguments(v)
           when String
-            list[idx] = "__||#{$1}||__" if v =~ /\{([a-z0-9_]+)\}/i
+            # Use match with block form to avoid thread-unsafe $1 global variable
+            if (match = v.match(/\{([a-z0-9_]+)\}/i))
+              list[idx] = "__||#{match[1]}||__"
+            end
           end
         end
         arguments
@@ -216,32 +222,41 @@ module ClientApiBuilder
         "#\{escape_path(#{var})}"
       end
 
-      @@namespaces = []
+      # Thread-local storage key for namespaces to ensure thread safety
+      NAMESPACE_THREAD_KEY = :client_api_builder_namespaces
+
       def namespaces
-        @@namespaces
+        Thread.current[NAMESPACE_THREAD_KEY] ||= []
       end
 
       # a namespace is a top level path to apply to all routes within the namespace block
       def namespace(name)
         namespaces << name
         yield
+      ensure
+        # Always pop the namespace, even if an exception occurs during yield
         namespaces.pop
       end
 
       def generate_route_code(method_name, path, options = {})
         http_method = options[:method] || auto_detect_http_method(method_name)
 
+        # Validate method_name to prevent code injection
+        raise ArgumentError, "Invalid method name: #{method_name.inspect}" unless method_name.to_s.match?(/\A[a-z_][a-z0-9_]*\z/i)
+
         path = namespaces.join + path
 
-        # instance method
-        path.gsub!(/\{([a-z0-9_]+)\}/i) do |_|
-          get_instance_method($1)
+        # instance method - use block parameter to avoid thread-unsafe $1
+        path = path.gsub(/\{([a-z0-9_]+)\}/i) do |_match|
+          param_name = Regexp.last_match(1)
+          get_instance_method(param_name)
         end
 
         path_arguments = []
-        path.gsub!(/:([a-z0-9_]+)/i) do |_|
-          path_arguments << $1
-          "#\{escape_path(#{$1})}"
+        path = path.gsub(/:([a-z0-9_]+)/i) do |_match|
+          param_name = Regexp.last_match(1)
+          path_arguments << param_name
+          "#\{escape_path(#{param_name})}"
         end
 
         has_body_param = options[:body].nil? && requires_body?(http_method, options)
@@ -250,7 +265,7 @@ module ClientApiBuilder
           if options[:query]
             query_arguments = get_arguments(options[:query])
             str = options[:query].inspect
-            str.gsub!(/"__\|\|(.+?)\|\|__"/) { $1 }
+            str = str.gsub(/"__\|\|(.+?)\|\|__"/) { Regexp.last_match(1) }
             str
           else
             query_arguments = []
@@ -262,7 +277,7 @@ module ClientApiBuilder
             has_body_param = false
             body_arguments = get_arguments(options[:body])
             str = options[:body].inspect
-            str.gsub!(/"__\|\|(.+?)\|\|__"/) { $1 }
+            str = str.gsub(/"__\|\|(.+?)\|\|__"/) { Regexp.last_match(1) }
             str
           else
             body_arguments = []
@@ -413,7 +428,13 @@ module ClientApiBuilder
     end
 
     def build_uri(path, query, options)
-      uri = URI(base_url + path)
+      # Properly join base_url and path to handle missing/extra slashes
+      base = base_url.to_s
+      base = base.chomp('/') if base.end_with?('/')
+      path = path.to_s
+      path = "/#{path}" unless path.start_with?('/')
+
+      uri = URI(base + path)
       uri.query = build_query(query, options)
       uri
     end
@@ -426,7 +447,15 @@ module ClientApiBuilder
     end
 
     def parse_response(response, _options)
-      response.body && JSON.parse(response.body)
+      body = response.body
+      return nil if body.nil? || body.empty?
+
+      JSON.parse(body)
+    rescue JSON::ParserError => e
+      raise ::ClientApiBuilder::UnexpectedResponse.new(
+        "Invalid JSON in response: #{e.message}",
+        response
+      )
     end
 
     def handle_response(response, options, &block)
@@ -468,7 +497,8 @@ module ClientApiBuilder
       begin
         @request_attempts += 1
         yield
-      rescue Exception => e
+      rescue StandardError => e
+        # Use StandardError instead of Exception to allow SystemExit, Interrupt, etc. to propagate
         log_request_exception(e)
         raise(e) if @request_attempts >= max_attempts || !retry_request?(e, options)
 
@@ -492,8 +522,17 @@ module ClientApiBuilder
       end
     end
 
-    def retry_request?(_exception, _options)
-      true
+    # Determines whether to retry on a given exception.
+    # Override this method to customize retry behavior.
+    # By default, only retries on network-related errors, not application errors.
+    def retry_request?(exception, _options)
+      case exception
+      when Net::OpenTimeout, Net::ReadTimeout, Errno::ECONNRESET,
+           Errno::ECONNREFUSED, Errno::ETIMEDOUT, SocketError, EOFError
+        true
+      else
+        false
+      end
     end
 
     def log_request_exception(exception)
@@ -501,11 +540,15 @@ module ClientApiBuilder
     end
 
     def request_log_message
+      return '' unless request_options
+
       method = request_options[:method].to_s.upcase
       uri = request_options[:uri]
-      response_code = response ? response.code : 'UNKNOWN'
+      return "#{method} [no URI]" unless uri
 
-      duration = (total_request_time * 1000).to_i
+      response_code = response ? response.code : 'UNKNOWN'
+      duration = total_request_time ? (total_request_time * 1000).to_i : 0
+
       "#{method} #{uri.scheme}://#{uri.host}#{uri.path}[#{response_code}] took #{duration}ms"
     end
   end

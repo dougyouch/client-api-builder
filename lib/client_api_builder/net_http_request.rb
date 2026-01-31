@@ -1,10 +1,21 @@
 # frozen_string_literal: true
 
 require 'net/http'
+require 'openssl'
 
 module ClientApiBuilder
   module NetHTTP
     module Request
+      # Allowed file modes for stream_to_file to prevent arbitrary mode injection
+      ALLOWED_FILE_MODES = %w[w wb a ab w+ wb+ a+ ab+].freeze
+
+      # Default connection options with secure SSL settings
+      DEFAULT_SECURE_OPTIONS = {
+        verify_mode: OpenSSL::SSL::VERIFY_PEER,
+        open_timeout: 30,
+        read_timeout: 60
+      }.freeze
+
       # Copied from https://ruby-doc.org/stdlib-2.7.1/libdoc/net/http/rdoc/Net/HTTP.html
       METHOD_TO_NET_HTTP_CLASS = {
         copy: Net::HTTP::Copy,
@@ -28,7 +39,11 @@ module ClientApiBuilder
         request = METHOD_TO_NET_HTTP_CLASS[method].new(uri.request_uri, headers)
         request.body = body if body
 
-        Net::HTTP.start(uri.hostname, uri.port, connection_options.merge(use_ssl: uri.scheme == 'https')) do |http|
+        # Merge secure defaults, then user options, ensuring SSL verification is enabled for HTTPS
+        ssl_options = uri.scheme == 'https' ? DEFAULT_SECURE_OPTIONS.merge(use_ssl: true) : {}
+        merged_options = ssl_options.merge(connection_options)
+
+        Net::HTTP.start(uri.hostname, uri.port, merged_options) do |http|
           http.request(request) do |response|
             yield response if block_given?
           end
@@ -50,9 +65,25 @@ module ClientApiBuilder
       end
 
       def stream_to_file(method:, uri:, body:, headers:, connection_options:, file:)
-        mode = connection_options.delete(:file_mode) || 'wb'
-        File.open(file, mode) do |io|
-          stream_to_io(method: method, uri: uri, body: body, headers: headers, connection_options: connection_options, io: io)
+        # Use dup to avoid mutating the original hash
+        opts = connection_options.dup
+        mode = opts.delete(:file_mode)
+
+        # Validate file mode - use whitelist approach
+        mode = if mode.nil?
+                 'wb'
+               elsif ALLOWED_FILE_MODES.include?(mode.to_s)
+                 mode.to_s
+               else
+                 raise ArgumentError, "Invalid file mode: #{mode.inspect}. Allowed modes: #{ALLOWED_FILE_MODES.join(', ')}"
+               end
+
+        # Validate file path - expand to absolute path and check for path traversal
+        expanded_path = File.expand_path(file)
+        raise ArgumentError, 'Invalid file path: potential path traversal detected' if file.to_s.include?('..') || expanded_path.include?("\0")
+
+        File.open(expanded_path, mode) do |io|
+          stream_to_io(method: method, uri: uri, body: body, headers: headers, connection_options: opts, io: io)
         end
       end
     end
