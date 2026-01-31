@@ -2,6 +2,7 @@
 
 module ClientApiBuilder
   class Error < StandardError; end
+
   class UnexpectedResponse < Error
     attr_reader :response
 

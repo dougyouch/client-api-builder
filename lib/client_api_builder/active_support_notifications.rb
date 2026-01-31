@@ -1,4 +1,5 @@
 # frozen_string_literal: true
+
 require 'active_support'
 
 # Purpose is to change the instrument_request to use ActiveSupport::Notifications.instrument
@@ -9,14 +10,13 @@ module ClientApiBuilder
       error = nil
       result = nil
       ActiveSupport::Notifications.instrument('client_api_builder.request', client: self) do
-        begin
-          result = yield
-        rescue Exception => e
-          error = e
-        end
+        result = yield
+      rescue Exception => e
+        error = e
       end
 
       raise(error) if error
+
       result
     ensure
       @total_request_time = Time.now - start_time

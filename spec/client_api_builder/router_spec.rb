@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require 'spec_helper'
 
 describe ClientApiBuilder::Router do
@@ -11,8 +13,8 @@ describe ClientApiBuilder::Router do
       base_url 'http://example.com'
       header 'Content-Type', 'application/json'
 
-      route :get_user, '/users/:id', query: {app_id: :app_id}
-      route :create_user, '/users', query: {app_id: :app_id}
+      route :get_user, '/users/:id', query: { app_id: :app_id }
+      route :create_user, '/users', query: { app_id: :app_id }
 
       namespace '/v2' do
         route :get_users, '/users'
@@ -23,12 +25,11 @@ describe ClientApiBuilder::Router do
       end
 
       def to_params(data)
-        params = []
-        data.each do |key, value|
+        params = data.map do |key, value|
           if value.is_a?(Array)
-            params  << "#{key}=#{value.join(',')}"
+            "#{key}=#{value.join(',')}"
           else
-            params  << "#{key}=#{value}"
+            "#{key}=#{value}"
           end
         end
         params.join('&')
@@ -41,7 +42,7 @@ describe ClientApiBuilder::Router do
   let(:app_key) { SecureRandom.uuid }
   let(:router) { router_class.new(authorization, request_count, app_key) }
   let(:expected_base_url) { 'http://example.com' }
-  let(:expected_connection_options) { {open_timeout: 100} }
+  let(:expected_connection_options) { { open_timeout: 100 } }
 
   context '.base_url' do
     subject { router_class.base_url }
@@ -62,7 +63,7 @@ describe ClientApiBuilder::Router do
     it { expect(subject).to eq(builder) }
 
     describe 'build query' do
-      let(:query) { {name: 'Foo Bar'} }
+      let(:query) { { name: 'Foo Bar' } }
       let(:expected_query) { 'name=Foo+Bar' }
       subject { router.class.build_query(router, query) }
 
@@ -77,7 +78,7 @@ describe ClientApiBuilder::Router do
       end
 
       describe 'instance_method' do
-        let(:query) { {name: ['Foo', 'Bar']} }
+        let(:query) { { name: %w[Foo Bar] } }
         let(:expected_query) { 'name=Foo,Bar' }
 
         before do
@@ -88,17 +89,16 @@ describe ClientApiBuilder::Router do
       end
 
       describe 'proc' do
-        let(:query) { {name: ['Foo', 'Bar']} }
+        let(:query) { { name: %w[Foo Bar] } }
         let(:expected_query) { 'name=Foo|Bar' }
 
         before do
-          router_class.query_builder() do |data|
-            params = []
-            data.each do |key, value|
+          router_class.query_builder do |data|
+            params = data.map do |key, value|
               if value.is_a?(Array)
-                params  << "#{key}=#{value.join('|')}"
+                "#{key}=#{value.join('|')}"
               else
-                params  << "#{key}=#{value}"
+                "#{key}=#{value}"
               end
             end
             params.join('&')
@@ -111,7 +111,7 @@ describe ClientApiBuilder::Router do
   end
 
   context '#build_query' do
-    let(:query) { {name: :name, test: proc { 'xyz' }, foo: 'Bar'} }
+    let(:query) { { name: :name, test: proc { 'xyz' }, foo: 'Bar' } }
     let(:expected_query) { 'name=Mike&test=xyz&foo=Bar' }
 
     before do
@@ -137,7 +137,7 @@ describe ClientApiBuilder::Router do
     it { expect(subject).to eq(builder) }
 
     describe 'build body' do
-      let(:body) { {name: 'Foo Bar'} }
+      let(:body) { { name: 'Foo Bar' } }
       let(:expected_body) { 'name=Foo+Bar' }
       subject { router.class.build_body(router, body) }
 
@@ -152,7 +152,7 @@ describe ClientApiBuilder::Router do
       end
 
       describe 'instance_method' do
-        let(:body) { {name: ['Foo', 'Bar']} }
+        let(:body) { { name: %w[Foo Bar] } }
         let(:expected_body) { 'name=Foo,Bar' }
 
         before do
@@ -163,17 +163,16 @@ describe ClientApiBuilder::Router do
       end
 
       describe 'proc' do
-        let(:body) { {name: ['Foo', 'Bar']} }
+        let(:body) { { name: %w[Foo Bar] } }
         let(:expected_body) { 'name=Foo|Bar' }
 
         before do
-          router_class.body_builder() do |data|
-            params = []
-            data.each do |key, value|
+          router_class.body_builder do |data|
+            params = data.map do |key, value|
               if value.is_a?(Array)
-                params  << "#{key}=#{value.join('|')}"
+                "#{key}=#{value.join('|')}"
               else
-                params  << "#{key}=#{value}"
+                "#{key}=#{value}"
               end
             end
             params.join('&')
@@ -253,7 +252,7 @@ describe ClientApiBuilder::Router do
 
     subject { router_class.get_arguments(query) }
 
-    let(:expected_hash_arguments) { [:name, :x, :name, :bar, :foo, :email] }
+    let(:expected_hash_arguments) { %i[name x name bar foo email] }
 
     it { expect(subject).to eq(expected_hash_arguments) }
   end
@@ -261,13 +260,16 @@ describe ClientApiBuilder::Router do
   context '.route' do
     let(:method_name) { :create_user }
     let(:path) { '/v2/apps/:app_id/users' }
-    let(:query) { {auth: :auth} }
-    let(:body) { {user: {name: :name, email: :email}} }
+    let(:query) { { auth: :auth } }
+    let(:body) { { user: { name: :name, email: :email } } }
     let(:expected_response_codes) { nil }
     let(:expected_response_code) { nil }
 
     let(:generated_code) { router_class.generate_route_code(method_name, path, query: query, body: body, expected_response_codes: expected_response_codes, expected_response_code: expected_response_code) }
-    subject { router_class.route(method_name, path, query: query, body: body, expected_response_codes: expected_response_codes, expected_response_code: expected_response_code); router_class.method_defined?(method_name) }
+    subject do
+      router_class.route(method_name, path, query: query, body: body, expected_response_codes: expected_response_codes, expected_response_code: expected_response_code)
+      router_class.method_defined?(method_name)
+    end
     let(:route_params) do
       {
         app_id: 8,
@@ -287,39 +289,43 @@ describe ClientApiBuilder::Router do
       }
     end
     let(:create_stubbed_response) do
-      stub_request(:post, "http://example.com/v2/apps/8/users?auth=secret").
-        to_return(status: 201, body: expected_route_return_value.to_json)
+      stub_request(:post, 'http://example.com/v2/apps/8/users?auth=secret')
+        .to_return(status: 201, body: expected_route_return_value.to_json)
     end
 
     let(:expected_code) do
-      <<-CODE
-def create_user_raw_response(app_id:, auth:, name:, email:, **__options__, &block)
-  __path__ = "/v2/apps/\#{escape_path(app_id)}/users"
-  __query__ = {auth: auth}
-  __body__ = {user: {name: name, email: email}}
-  __uri__ = build_uri(__path__, __query__, __options__)
-  __body__ = build_body(__body__, __options__)
-  __headers__ = build_headers(__options__)
-  __connection_options__ = build_connection_options(__options__)
-  @request_options = {method: :post, uri: __uri__, body: __body__, headers: __headers__, connection_options: __connection_options__}
-  @response = request(**@request_options)
-end
+      <<~CODE
+        def create_user_raw_response(app_id:, auth:, name:, email:, **__options__, &block)
+          __path__ = "/v2/apps/\#{escape_path(app_id)}/users"
+          __query__ = {auth: auth}
+          __body__ = {user: {name: name, email: email}}
+          __uri__ = build_uri(__path__, __query__, __options__)
+          __body__ = build_body(__body__, __options__)
+          __headers__ = build_headers(__options__)
+          __connection_options__ = build_connection_options(__options__)
+          @request_options = {method: :post, uri: __uri__, body: __body__, headers: __headers__, connection_options: __connection_options__}
+          @response = request(**@request_options)
+        end
 
-def create_user(app_id:, auth:, name:, email:, **__options__, &block)
-  request_wrapper(__options__) do
-    block ||= self.class.get_response_proc(:create_user)
-    __expected_response_codes__ = []
-    create_user_raw_response(app_id: app_id, auth: auth, name: name, email: email, **__options__, &block)
-    expected_response_code!(@response, __expected_response_codes__, __options__)
-    handle_response(@response, __options__, &block)
-  end
-end
-CODE
+        def create_user(app_id:, auth:, name:, email:, **__options__, &block)
+          request_wrapper(__options__) do
+            block ||= self.class.get_response_proc(:create_user)
+            __expected_response_codes__ = []
+            create_user_raw_response(app_id: app_id, auth: auth, name: name, email: email, **__options__, &block)
+            expected_response_code!(@response, __expected_response_codes__, __options__)
+            handle_response(@response, __options__, &block)
+          end
+        end
+      CODE
     end
 
     it { expect(generated_code).to eq(expected_code) }
     it { expect(subject).to eq(true) }
-    it { subject; create_stubbed_response; expect(call_route).to eq(expected_route_return_value) }
+    it {
+      subject
+      create_stubbed_response
+      expect(call_route).to eq(expected_route_return_value)
+    }
 
     describe 'get request no body' do
       let(:path) { '/v2/apps/:app_id/users/:user_id' }
@@ -327,29 +333,29 @@ CODE
       let(:body) { nil }
 
       let(:expected_code) do
-        <<-CODE
-def get_user_raw_response(app_id:, user_id:, auth:, **__options__, &block)
-  __path__ = "/v2/apps/\#{escape_path(app_id)}/users/\#{escape_path(user_id)}"
-  __query__ = {auth: auth}
-  __body__ = nil
-  __uri__ = build_uri(__path__, __query__, __options__)
-  __body__ = build_body(__body__, __options__)
-  __headers__ = build_headers(__options__)
-  __connection_options__ = build_connection_options(__options__)
-  @request_options = {method: :get, uri: __uri__, body: __body__, headers: __headers__, connection_options: __connection_options__}
-  @response = request(**@request_options)
-end
+        <<~CODE
+          def get_user_raw_response(app_id:, user_id:, auth:, **__options__, &block)
+            __path__ = "/v2/apps/\#{escape_path(app_id)}/users/\#{escape_path(user_id)}"
+            __query__ = {auth: auth}
+            __body__ = nil
+            __uri__ = build_uri(__path__, __query__, __options__)
+            __body__ = build_body(__body__, __options__)
+            __headers__ = build_headers(__options__)
+            __connection_options__ = build_connection_options(__options__)
+            @request_options = {method: :get, uri: __uri__, body: __body__, headers: __headers__, connection_options: __connection_options__}
+            @response = request(**@request_options)
+          end
 
-def get_user(app_id:, user_id:, auth:, **__options__, &block)
-  request_wrapper(__options__) do
-    block ||= self.class.get_response_proc(:get_user)
-    __expected_response_codes__ = []
-    get_user_raw_response(app_id: app_id, user_id: user_id, auth: auth, **__options__, &block)
-    expected_response_code!(@response, __expected_response_codes__, __options__)
-    handle_response(@response, __options__, &block)
-  end
-end
-CODE
+          def get_user(app_id:, user_id:, auth:, **__options__, &block)
+            request_wrapper(__options__) do
+              block ||= self.class.get_response_proc(:get_user)
+              __expected_response_codes__ = []
+              get_user_raw_response(app_id: app_id, user_id: user_id, auth: auth, **__options__, &block)
+              expected_response_code!(@response, __expected_response_codes__, __options__)
+              handle_response(@response, __options__, &block)
+            end
+          end
+        CODE
       end
       let(:route_params) do
         {
@@ -359,13 +365,17 @@ CODE
         }
       end
       let(:create_stubbed_response) do
-        stub_request(:get, "http://example.com/v2/apps/8/users/6?auth=secret").
-          to_return(status: 200, body: expected_route_return_value.to_json)
+        stub_request(:get, 'http://example.com/v2/apps/8/users/6?auth=secret')
+          .to_return(status: 200, body: expected_route_return_value.to_json)
       end
 
       it { expect(generated_code).to eq(expected_code) }
       it { expect(subject).to eq(true) }
-      it { subject; create_stubbed_response; expect(call_route).to eq(expected_route_return_value) }
+      it {
+        subject
+        create_stubbed_response
+        expect(call_route).to eq(expected_route_return_value)
+      }
     end
 
     describe 'get request no body, no query' do
@@ -375,29 +385,29 @@ CODE
       let(:expected_response_code) { 202 }
 
       let(:expected_code) do
-        <<-CODE
-def get_users_raw_response(app_id:, **__options__, &block)
-  __path__ = "/v2/apps/\#{escape_path(app_id)}/users"
-  __query__ = nil
-  __body__ = nil
-  __uri__ = build_uri(__path__, __query__, __options__)
-  __body__ = build_body(__body__, __options__)
-  __headers__ = build_headers(__options__)
-  __connection_options__ = build_connection_options(__options__)
-  @request_options = {method: :get, uri: __uri__, body: __body__, headers: __headers__, connection_options: __connection_options__}
-  @response = request(**@request_options)
-end
+        <<~CODE
+          def get_users_raw_response(app_id:, **__options__, &block)
+            __path__ = "/v2/apps/\#{escape_path(app_id)}/users"
+            __query__ = nil
+            __body__ = nil
+            __uri__ = build_uri(__path__, __query__, __options__)
+            __body__ = build_body(__body__, __options__)
+            __headers__ = build_headers(__options__)
+            __connection_options__ = build_connection_options(__options__)
+            @request_options = {method: :get, uri: __uri__, body: __body__, headers: __headers__, connection_options: __connection_options__}
+            @response = request(**@request_options)
+          end
 
-def get_users(app_id:, **__options__, &block)
-  request_wrapper(__options__) do
-    block ||= self.class.get_response_proc(:get_users)
-    __expected_response_codes__ = ["202"]
-    get_users_raw_response(app_id: app_id, **__options__, &block)
-    expected_response_code!(@response, __expected_response_codes__, __options__)
-    handle_response(@response, __options__, &block)
-  end
-end
-CODE
+          def get_users(app_id:, **__options__, &block)
+            request_wrapper(__options__) do
+              block ||= self.class.get_response_proc(:get_users)
+              __expected_response_codes__ = ["202"]
+              get_users_raw_response(app_id: app_id, **__options__, &block)
+              expected_response_code!(@response, __expected_response_codes__, __options__)
+              handle_response(@response, __options__, &block)
+            end
+          end
+        CODE
       end
       let(:route_params) do
         {
@@ -405,13 +415,17 @@ CODE
         }
       end
       let(:create_stubbed_response) do
-        stub_request(:get, "http://example.com/v2/apps/8/users").
-          to_return(status: 202, body: expected_route_return_value.to_json)
+        stub_request(:get, 'http://example.com/v2/apps/8/users')
+          .to_return(status: 202, body: expected_route_return_value.to_json)
       end
 
       it { expect(generated_code).to eq(expected_code) }
       it { expect(subject).to eq(true) }
-      it { subject; create_stubbed_response; expect(call_route).to eq(expected_route_return_value) }
+      it {
+        subject
+        create_stubbed_response
+        expect(call_route).to eq(expected_route_return_value)
+      }
     end
 
     describe 'delete request' do
@@ -422,29 +436,29 @@ CODE
       let(:expected_response_codes) { [200, 204] }
 
       let(:expected_code) do
-        <<-CODE
-def delete_user_raw_response(app_id:, user_id:, **__options__, &block)
-  __path__ = "/v2/apps/\#{escape_path(app_id)}/users/\#{escape_path(user_id)}"
-  __query__ = nil
-  __body__ = nil
-  __uri__ = build_uri(__path__, __query__, __options__)
-  __body__ = build_body(__body__, __options__)
-  __headers__ = build_headers(__options__)
-  __connection_options__ = build_connection_options(__options__)
-  @request_options = {method: :delete, uri: __uri__, body: __body__, headers: __headers__, connection_options: __connection_options__}
-  @response = request(**@request_options)
-end
+        <<~CODE
+          def delete_user_raw_response(app_id:, user_id:, **__options__, &block)
+            __path__ = "/v2/apps/\#{escape_path(app_id)}/users/\#{escape_path(user_id)}"
+            __query__ = nil
+            __body__ = nil
+            __uri__ = build_uri(__path__, __query__, __options__)
+            __body__ = build_body(__body__, __options__)
+            __headers__ = build_headers(__options__)
+            __connection_options__ = build_connection_options(__options__)
+            @request_options = {method: :delete, uri: __uri__, body: __body__, headers: __headers__, connection_options: __connection_options__}
+            @response = request(**@request_options)
+          end
 
-def delete_user(app_id:, user_id:, **__options__, &block)
-  request_wrapper(__options__) do
-    block ||= self.class.get_response_proc(:delete_user)
-    __expected_response_codes__ = ["200", "204"]
-    delete_user_raw_response(app_id: app_id, user_id: user_id, **__options__, &block)
-    expected_response_code!(@response, __expected_response_codes__, __options__)
-    handle_response(@response, __options__, &block)
-  end
-end
-CODE
+          def delete_user(app_id:, user_id:, **__options__, &block)
+            request_wrapper(__options__) do
+              block ||= self.class.get_response_proc(:delete_user)
+              __expected_response_codes__ = ["200", "204"]
+              delete_user_raw_response(app_id: app_id, user_id: user_id, **__options__, &block)
+              expected_response_code!(@response, __expected_response_codes__, __options__)
+              handle_response(@response, __options__, &block)
+            end
+          end
+        CODE
       end
       let(:route_params) do
         {
@@ -453,14 +467,18 @@ CODE
         }
       end
       let(:create_stubbed_response) do
-        stub_request(:delete, "http://example.com/v2/apps/8/users/6").
-          to_return(status: 204, body: '')
+        stub_request(:delete, 'http://example.com/v2/apps/8/users/6')
+          .to_return(status: 204, body: '')
       end
       let(:expected_route_return_value) { nil }
 
       it { expect(generated_code).to eq(expected_code) }
       it { expect(subject).to eq(true) }
-      it { subject; create_stubbed_response; expect(call_route).to eq(expected_route_return_value) }
+      it {
+        subject
+        create_stubbed_response
+        expect(call_route).to eq(expected_route_return_value)
+      }
     end
 
     describe 'create request' do
@@ -471,29 +489,29 @@ CODE
       let(:expected_response_code) { 201 }
 
       let(:expected_code) do
-        <<-CODE
-def create_app_raw_response(body:, **__options__, &block)
-  __path__ = "/v2/apps"
-  __query__ = nil
-  __body__ = body
-  __uri__ = build_uri(__path__, __query__, __options__)
-  __body__ = build_body(__body__, __options__)
-  __headers__ = build_headers(__options__)
-  __connection_options__ = build_connection_options(__options__)
-  @request_options = {method: :post, uri: __uri__, body: __body__, headers: __headers__, connection_options: __connection_options__}
-  @response = request(**@request_options)
-end
+        <<~CODE
+          def create_app_raw_response(body:, **__options__, &block)
+            __path__ = "/v2/apps"
+            __query__ = nil
+            __body__ = body
+            __uri__ = build_uri(__path__, __query__, __options__)
+            __body__ = build_body(__body__, __options__)
+            __headers__ = build_headers(__options__)
+            __connection_options__ = build_connection_options(__options__)
+            @request_options = {method: :post, uri: __uri__, body: __body__, headers: __headers__, connection_options: __connection_options__}
+            @response = request(**@request_options)
+          end
 
-def create_app(body:, **__options__, &block)
-  request_wrapper(__options__) do
-    block ||= self.class.get_response_proc(:create_app)
-    __expected_response_codes__ = ["201"]
-    create_app_raw_response(body: body, **__options__, &block)
-    expected_response_code!(@response, __expected_response_codes__, __options__)
-    handle_response(@response, __options__, &block)
-  end
-end
-CODE
+          def create_app(body:, **__options__, &block)
+            request_wrapper(__options__) do
+              block ||= self.class.get_response_proc(:create_app)
+              __expected_response_codes__ = ["201"]
+              create_app_raw_response(body: body, **__options__, &block)
+              expected_response_code!(@response, __expected_response_codes__, __options__)
+              handle_response(@response, __options__, &block)
+            end
+          end
+        CODE
       end
 
       it { expect(generated_code).to eq(expected_code) }
@@ -508,34 +526,33 @@ CODE
       let(:expected_response_code) { 200 }
 
       let(:expected_code) do
-        <<-CODE
-def get_app_users_raw_response(**__options__, &block)
-  __path__ = "/v2/apps/\#{escape_path(app_key)}/users"
-  __query__ = nil
-  __body__ = nil
-  __uri__ = build_uri(__path__, __query__, __options__)
-  __body__ = build_body(__body__, __options__)
-  __headers__ = build_headers(__options__)
-  __connection_options__ = build_connection_options(__options__)
-  @request_options = {method: :get, uri: __uri__, body: __body__, headers: __headers__, connection_options: __connection_options__}
-  @response = request(**@request_options)
-end
+        <<~CODE
+          def get_app_users_raw_response(**__options__, &block)
+            __path__ = "/v2/apps/\#{escape_path(app_key)}/users"
+            __query__ = nil
+            __body__ = nil
+            __uri__ = build_uri(__path__, __query__, __options__)
+            __body__ = build_body(__body__, __options__)
+            __headers__ = build_headers(__options__)
+            __connection_options__ = build_connection_options(__options__)
+            @request_options = {method: :get, uri: __uri__, body: __body__, headers: __headers__, connection_options: __connection_options__}
+            @response = request(**@request_options)
+          end
 
-def get_app_users(**__options__, &block)
-  request_wrapper(__options__) do
-    block ||= self.class.get_response_proc(:get_app_users)
-    __expected_response_codes__ = ["200"]
-    get_app_users_raw_response(**__options__, &block)
-    expected_response_code!(@response, __expected_response_codes__, __options__)
-    handle_response(@response, __options__, &block)
-  end
-end
-CODE
+          def get_app_users(**__options__, &block)
+            request_wrapper(__options__) do
+              block ||= self.class.get_response_proc(:get_app_users)
+              __expected_response_codes__ = ["200"]
+              get_app_users_raw_response(**__options__, &block)
+              expected_response_code!(@response, __expected_response_codes__, __options__)
+              handle_response(@response, __options__, &block)
+            end
+          end
+        CODE
       end
 
       it { expect(generated_code).to eq(expected_code) }
       it { expect(subject).to eq(true) }
-
     end
   end
 

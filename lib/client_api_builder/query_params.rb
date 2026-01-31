@@ -1,4 +1,5 @@
 # frozen_string_literal: true
+
 require 'cgi'
 
 module ClientApiBuilder
@@ -38,10 +39,10 @@ module ClientApiBuilder
           array_namespace = namespace ? "#{namespace}[#{escape(key.to_s)}][]" : "#{escape(key.to_s)}[]"
           query_params += to_query_from_array(value, array_namespace)
         when Hash
-          hash_namespace = namespace ? "#{namespace}[#{escape(key.to_s)}]" : "#{escape(key.to_s)}"
+          hash_namespace = namespace ? "#{namespace}[#{escape(key.to_s)}]" : escape(key.to_s).to_s
           query_params += to_query_from_hash(value, hash_namespace)
         else
-          query_name = namespace ? "#{namespace}[#{escape(key.to_s)}]" : "#{escape(key.to_s)}"
+          query_name = namespace ? "#{namespace}[#{escape(key.to_s)}]" : escape(key.to_s).to_s
           query_params << "#{query_name}#{name_value_separator}#{escape(value.to_s)}"
         end
       end

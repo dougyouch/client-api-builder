@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class LoremIpsumClient
   include ClientApiBuilder::Router
 
@@ -12,5 +14,5 @@ class LoremIpsumClient
   header 'Accept', 'application/json'
 
   # this creates a method called create_lorem_ipsum with 2 named arguments amont and what
-  route :create_lorem_ipsum, '/feed/json', body: {amount: :amount, what: :what, start: 'yes', generate: 'Generate Lorem Ipsum'}
+  route :create_lorem_ipsum, '/feed/json', body: { amount: :amount, what: :what, start: 'yes', generate: 'Generate Lorem Ipsum' }
 end

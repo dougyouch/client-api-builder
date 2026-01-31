@@ -17,15 +17,15 @@ module ClientApiBuilder
     end
 
     def self.get_instance_method(var)
-      "\#{root_router.#{var}\}"
+      "\#{root_router.#{var}}"
     end
 
     def base_url
       self.class.base_url || root_router.base_url
     end
 
-    def handle_response(response, options, &block)
-      root_router.handle_response(response, options, &block)
+    def handle_response(response, options, &)
+      root_router.handle_response(response, options, &)
     end
   end
 end

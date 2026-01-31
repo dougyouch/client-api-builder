@@ -1,11 +1,12 @@
+# frozen_string_literal: true
+
 require 'base64'
 require 'securerandom'
 
-class BasicAuthExampleClient < Struct.new(
-        :username,
-        :password
-      )
-
+BasicAuthExampleClient = Struct.new(
+  :username,
+  :password
+) do
   include ClientApiBuilder::Router
   include ClientApiBuilder::Section
 

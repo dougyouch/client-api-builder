@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require 'spec_helper'
 
 describe ClientApiBuilder::QueryParams do
@@ -70,7 +72,7 @@ describe ClientApiBuilder::QueryParams do
           'bar[][]=1'
         ].join(param_separator)
       end
-        
+
       it { is_expected.to eq(expected_query) }
 
       describe 'without namespace' do
@@ -109,7 +111,7 @@ describe ClientApiBuilder::QueryParams do
       let(:data) { 'foo bar' }
       let(:namespace) { nil }
       let(:expected_query) { 'foo%20bar' }
-      
+
       it { is_expected.to eq(expected_query) }
     end
   end

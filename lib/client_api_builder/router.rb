@@ -1,4 +1,5 @@
 # frozen_string_literal: true
+
 require 'inheritance-helper'
 require 'json'
 
@@ -14,11 +15,11 @@ module ClientApiBuilder
     end
 
     module ClassMethods
-      REQUIRED_BODY_HTTP_METHODS = [
-        :post,
-        :put,
-        :patch
-      ]
+      REQUIRED_BODY_HTTP_METHODS = %i[
+        post
+        put
+        patch
+      ].freeze
 
       def default_options
         {
@@ -212,7 +213,7 @@ module ClientApiBuilder
       end
 
       def get_instance_method(var)
-         "#\{escape_path(#{var})\}"
+        "#\{escape_path(#{var})}"
       end
 
       @@namespaces = []
@@ -240,7 +241,7 @@ module ClientApiBuilder
         path_arguments = []
         path.gsub!(/:([a-z0-9_]+)/i) do |_|
           path_arguments << $1
-          "#\{escape_path(#{$1})\}"
+          "#\{escape_path(#{$1})}"
         end
 
         has_body_param = options[:body].nil? && requires_body?(http_method, options)
@@ -308,17 +309,17 @@ module ClientApiBuilder
         code += "  @request_options = {method: #{http_method.inspect}, uri: __uri__, body: __body__, headers: __headers__, connection_options: __connection_options__}\n"
         code += "  @request_options[:#{stream_param}] = #{stream_param}\n" if stream_param
 
-        case options[:stream]
-        when true,
+        code += case options[:stream]
+                when true,
              :file
-          code += "  @response = stream_to_file(**@request_options)\n"
-        when :io
-          code += "  @response = stream_to_io(**@request_options)\n"
-        when :block
-          code += "  @response = stream(**@request_options, &block)\n"
-        else
-          code += "  @response = request(**@request_options)\n"
-        end
+                  "  @response = stream_to_file(**@request_options)\n"
+                when :io
+                  "  @response = stream_to_io(**@request_options)\n"
+                when :block
+                  "  @response = stream(**@request_options, &block)\n"
+                else
+                  "  @response = request(**@request_options)\n"
+                end
         code += "end\n"
         code += "\n"
 
@@ -329,13 +330,13 @@ module ClientApiBuilder
         code += "    #{method_name}_raw_response(" + method_args.map { |a| a =~ /:$/ ? "#{a} #{a.sub(':', '')}" : a }.join(', ') + ")\n"
         code += "    expected_response_code!(@response, __expected_response_codes__, __options__)\n"
 
-        if options[:stream] || options[:return] == :response
-          code += "    @response\n"
-        elsif options[:return] == :body
-          code += "    @response.body\n"
-        else
-          code += "    handle_response(@response, __options__, &block)\n"
-        end
+        code += if options[:stream] || options[:return] == :response
+                  "    @response\n"
+                elsif options[:return] == :body
+                  "    @response.body\n"
+                else
+                  "    handle_response(@response, __options__, &block)\n"
+                end
 
         code += "  end\n"
         code += "end\n"
@@ -345,7 +346,7 @@ module ClientApiBuilder
       def route(method_name, path, options = {}, &block)
         add_response_proc(method_name, block) if block
 
-        self.class_eval generate_route_code(method_name, path, options), __FILE__, __LINE__
+        class_eval generate_route_code(method_name, path, options), __FILE__, __LINE__
       end
     end
 
@@ -368,7 +369,7 @@ module ClientApiBuilder
       end
 
       self.class.default_headers.each(&add_header_proc)
-      options[:headers] && options[:headers].each(&add_header_proc)
+      options[:headers]&.each(&add_header_proc)
 
       headers
     end
@@ -396,8 +397,8 @@ module ClientApiBuilder
       end
 
       self.class.default_query_params.each(&add_query_param_proc)
-      query && query.each(&add_query_param_proc)
-      options[:query] && options[:query].each(&add_query_param_proc)
+      query&.each(&add_query_param_proc)
+      options[:query]&.each(&add_query_param_proc)
 
       query_params.empty? ? nil : self.class.build_query(self, query_params)
     end
@@ -417,14 +418,14 @@ module ClientApiBuilder
       uri
     end
 
-    def expected_response_code!(response, expected_response_codes, options)
-      return if expected_response_codes.empty? && response.kind_of?(Net::HTTPSuccess)
+    def expected_response_code!(response, expected_response_codes, _options)
+      return if expected_response_codes.empty? && response.is_a?(Net::HTTPSuccess)
       return if expected_response_codes.include?(response.code)
 
       raise(::ClientApiBuilder::UnexpectedResponse.new("unexpected response code #{response.code}", response))
     end
 
-    def parse_response(response, options)
+    def parse_response(response, _options)
       response.body && JSON.parse(response.body)
     end
 
@@ -470,13 +471,14 @@ module ClientApiBuilder
       rescue Exception => e
         log_request_exception(e)
         raise(e) if @request_attempts >= max_attempts || !retry_request?(e, options)
+
         sleep_time = get_retry_request_sleep_time(e, options)
-        sleep(sleep_time) if sleep_time && sleep_time > 0
+        sleep(sleep_time) if sleep_time&.positive?
         retry
       end
     end
 
-    def get_retry_request_sleep_time(e, options)
+    def get_retry_request_sleep_time(_e, options)
       options[:sleep] || self.class.default_options[:sleep] || 0.05
     end
 
@@ -484,20 +486,18 @@ module ClientApiBuilder
       options[:retries] || self.class.default_options[:max_retries] || 1
     end
 
-    def request_wrapper(options)
+    def request_wrapper(options, &block)
       retry_request(options) do
-        instrument_request do
-          yield
-        end
+        instrument_request(&block)
       end
     end
 
-    def retry_request?(exception, options)
+    def retry_request?(_exception, _options)
       true
     end
 
     def log_request_exception(exception)
-      ::ClientApiBuilder.logger && ::ClientApiBuilder.logger.error(exception)
+      ::ClientApiBuilder.logger&.error(exception)
     end
 
     def request_log_message

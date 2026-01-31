@@ -1,4 +1,5 @@
 # frozen_string_literal: true
+
 require 'net/http'
 
 module ClientApiBuilder
@@ -21,7 +22,7 @@ module ClientApiBuilder
         put: Net::HTTP::Put,
         trace: Net::HTTP::Trace,
         unlock: Net::HTTP::Unlock
-      }
+      }.freeze
 
       def request(method:, uri:, body:, headers:, connection_options:)
         request = METHOD_TO_NET_HTTP_CLASS[method].new(uri.request_uri, headers)

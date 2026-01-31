@@ -8,7 +8,7 @@ autoload :BasicAuthExampleClient, 'basic_auth_example_client'
 autoload :IMDBDatesetsClient, 'imdb_datasets_client'
 autoload :LoremIpsumClient, 'lorem_ipsum_client'
 require 'logger'
-LOG = Logger.new(STDOUT)
+LOG = Logger.new($stdout)
 ClientApiBuilder.logger = LOG
 ClientApiBuilder::ActiveSupportLogSubscriber.new(LOG).subscribe!
 require 'irb'
