@@ -238,18 +238,12 @@ module ClientApiBuilder
         namespaces.pop
       end
 
-      def generate_route_code(method_name, path, options = {})
-        http_method = options[:method] || auto_detect_http_method(method_name)
-
-        # Validate method_name to prevent code injection
-        raise ArgumentError, "Invalid method name: #{method_name.inspect}" unless method_name.to_s.match?(/\A[a-z_][a-z0-9_]*\z/i)
-
+      def process_route_path(path)
         path = namespaces.join + path
 
         # instance method - use block parameter to avoid thread-unsafe $1
         path = path.gsub(/\{([a-z0-9_]+)\}/i) do |_match|
-          param_name = Regexp.last_match(1)
-          get_instance_method(param_name)
+          get_instance_method(Regexp.last_match(1))
         end
 
         path_arguments = []
@@ -259,103 +253,125 @@ module ClientApiBuilder
           "#\{escape_path(#{param_name})}"
         end
 
+        [path, path_arguments]
+      end
+
+      def build_query_code(options)
+        if options[:query]
+          query_arguments = get_arguments(options[:query])
+          str = options[:query].inspect
+          str = str.gsub(/"__\|\|(.+?)\|\|__"/) { Regexp.last_match(1) }
+          [str, query_arguments.map(&:to_s)]
+        else
+          ['nil', []]
+        end
+      end
+
+      def build_body_code(options, has_body_param)
+        if options[:body]
+          body_arguments = get_arguments(options[:body])
+          str = options[:body].inspect
+          str = str.gsub(/"__\|\|(.+?)\|\|__"/) { Regexp.last_match(1) }
+          [str, body_arguments.map(&:to_s), false]
+        else
+          [has_body_param ? 'body' : 'nil', [], has_body_param]
+        end
+      end
+
+      def extract_expected_response_codes(options)
+        codes = options[:expected_response_codes] || (options[:expected_response_code] ? [options[:expected_response_code]] : [])
+        codes.map(&:to_s)
+      end
+
+      def determine_stream_param(options)
+        case options[:stream]
+        when true, :file then :file
+        when :io then :io
+        end
+      end
+
+      def build_method_args(named_arguments, has_body_param, stream_param)
+        args = named_arguments.map { |arg_name| "#{arg_name}:" }
+        args += ['body:'] if has_body_param
+        args += ["#{stream_param}:"] if stream_param
+        args + ['**__options__', '&block']
+      end
+
+      def generate_request_call_code(options, stream_param)
+        code = "  @request_options[:#{stream_param}] = #{stream_param}\n" if stream_param
+        code ||= ''
+
+        code + case options[:stream]
+               when true, :file then "  @response = stream_to_file(**@request_options)\n"
+               when :io then "  @response = stream_to_io(**@request_options)\n"
+               when :block then "  @response = stream(**@request_options, &block)\n"
+               else "  @response = request(**@request_options)\n"
+               end
+      end
+
+      def generate_response_handling_code(options)
+        if options[:stream] || options[:return] == :response
+          "    @response\n"
+        elsif options[:return] == :body
+          "    @response.body\n"
+        else
+          "    handle_response(@response, __options__, &block)\n"
+        end
+      end
+
+      def generate_route_code(method_name, path, options = {})
+        # Validate method_name to prevent code injection
+        raise ArgumentError, "Invalid method name: #{method_name.inspect}" unless method_name.to_s.match?(/\A[a-z_][a-z0-9_]*\z/i)
+
+        http_method = options[:method] || auto_detect_http_method(method_name)
+        path, path_arguments = process_route_path(path)
         has_body_param = options[:body].nil? && requires_body?(http_method, options)
 
-        query =
-          if options[:query]
-            query_arguments = get_arguments(options[:query])
-            str = options[:query].inspect
-            str = str.gsub(/"__\|\|(.+?)\|\|__"/) { Regexp.last_match(1) }
-            str
-          else
-            query_arguments = []
-            'nil'
-          end
+        query, query_arguments = build_query_code(options)
+        body, body_arguments, has_body_param = build_body_code(options, has_body_param)
 
-        body =
-          if options[:body]
-            has_body_param = false
-            body_arguments = get_arguments(options[:body])
-            str = options[:body].inspect
-            str = str.gsub(/"__\|\|(.+?)\|\|__"/) { Regexp.last_match(1) }
-            str
-          else
-            body_arguments = []
-            has_body_param ? 'body' : 'nil'
-          end
+        named_arguments = (path_arguments + query_arguments + body_arguments).uniq
+        expected_response_codes = extract_expected_response_codes(options)
+        stream_param = determine_stream_param(options)
+        method_args = build_method_args(named_arguments, has_body_param, stream_param)
 
-        query_arguments.map!(&:to_s)
-        body_arguments.map!(&:to_s)
-        named_arguments = path_arguments + query_arguments + body_arguments
-        named_arguments.uniq!
+        route_context = {
+          method_name: method_name, method_args: method_args, path: path,
+          query: query, body: body, http_method: http_method,
+          options: options, stream_param: stream_param,
+          expected_response_codes: expected_response_codes
+        }
 
-        expected_response_codes =
-          if options[:expected_response_codes]
-            options[:expected_response_codes]
-          elsif options[:expected_response_code]
-            [options[:expected_response_code]]
-          else
-            []
-          end
-        expected_response_codes.map!(&:to_s)
+        generate_raw_response_method(route_context) + generate_wrapper_method(route_context)
+      end
 
-        stream_param =
-          case options[:stream]
-          when true,
-               :file
-            :file
-          when :io
-            :io
-          end
-
-        method_args = named_arguments.map { |arg_name| "#{arg_name}:" }
-        method_args += ['body:'] if has_body_param
-        method_args += ["#{stream_param}:"] if stream_param
-        method_args += ['**__options__', '&block']
-
-        code = "def #{method_name}_raw_response(" + method_args.join(', ') + ")\n"
-        code += "  __path__ = \"#{path}\"\n"
-        code += "  __query__ = #{query}\n"
-        code += "  __body__ = #{body}\n"
+      def generate_raw_response_method(ctx)
+        code = "def #{ctx[:method_name]}_raw_response(#{ctx[:method_args].join(', ')})\n"
+        code += "  __path__ = \"#{ctx[:path]}\"\n"
+        code += "  __query__ = #{ctx[:query]}\n"
+        code += "  __body__ = #{ctx[:body]}\n"
         code += "  __uri__ = build_uri(__path__, __query__, __options__)\n"
         code += "  __body__ = build_body(__body__, __options__)\n"
         code += "  __headers__ = build_headers(__options__)\n"
         code += "  __connection_options__ = build_connection_options(__options__)\n"
-        code += "  @request_options = {method: #{http_method.inspect}, uri: __uri__, body: __body__, headers: __headers__, connection_options: __connection_options__}\n"
-        code += "  @request_options[:#{stream_param}] = #{stream_param}\n" if stream_param
+        code += "  @request_options = {method: #{ctx[:http_method].inspect}, uri: __uri__, body: __body__, " \
+                "headers: __headers__, connection_options: __connection_options__}\n"
+        code += generate_request_call_code(ctx[:options], ctx[:stream_param])
+        code + "end\n\n"
+      end
 
-        code += case options[:stream]
-                when true,
-             :file
-                  "  @response = stream_to_file(**@request_options)\n"
-                when :io
-                  "  @response = stream_to_io(**@request_options)\n"
-                when :block
-                  "  @response = stream(**@request_options, &block)\n"
-                else
-                  "  @response = request(**@request_options)\n"
-                end
-        code += "end\n"
-        code += "\n"
+      def generate_wrapper_method(ctx)
+        raw_call_args = ctx[:method_args].map { |a| a =~ /:$/ ? "#{a} #{a.sub(':', '')}" : a }.join(', ')
 
-        code += "def #{method_name}(" + method_args.join(', ') + ")\n"
+        code = "def #{ctx[:method_name]}(#{ctx[:method_args].join(', ')})\n"
         code += "  request_wrapper(__options__) do\n"
-        code += "    block ||= self.class.get_response_proc(#{method_name.inspect})\n"
-        code += "    __expected_response_codes__ = #{expected_response_codes.inspect}\n"
-        code += "    #{method_name}_raw_response(" + method_args.map { |a| a =~ /:$/ ? "#{a} #{a.sub(':', '')}" : a }.join(', ') + ")\n"
+        code += "    block ||= self.class.get_response_proc(#{ctx[:method_name].inspect})\n"
+        code += "    __expected_response_codes__ = #{ctx[:expected_response_codes].inspect}\n"
+        code += "    #{ctx[:method_name]}_raw_response(#{raw_call_args})\n"
         code += "    expected_response_code!(@response, __expected_response_codes__, __options__)\n"
-
-        code += if options[:stream] || options[:return] == :response
-                  "    @response\n"
-                elsif options[:return] == :body
-                  "    @response.body\n"
-                else
-                  "    handle_response(@response, __options__, &block)\n"
-                end
-
+        code += generate_response_handling_code(ctx[:options])
         code += "  end\n"
-        code += "end\n"
-        code
+        code + "end\n"
       end
 
       def route(method_name, path, options = {}, &block)
