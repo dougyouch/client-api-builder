@@ -1,0 +1,89 @@
+AllCops:
+  TargetRubyVersion: 3.2
+  NewCops: enable
+  SuggestExtensions: false
+  Exclude:
+    - 'bin/**/*'
+    - 'vendor/**/*'
+    - 'coverage/**/*'
+
+# Relaxed metrics for existing codebase
+Metrics/MethodLength:
+  Max: 100
+
+Metrics/AbcSize:
+  Max: 80
+
+Metrics/ClassLength:
+  Max: 200
+
+Metrics/ModuleLength:
+  Max: 300
+
+Metrics/CyclomaticComplexity:
+  Max: 30
+
+Metrics/PerceivedComplexity:
+  Max: 30
+
+Metrics/BlockLength:
+  Exclude:
+    - 'spec/**/*'
+    - '*.gemspec'
+
+Metrics/ParameterLists:
+  Max: 7
+
+# Style preferences
+Style/Documentation:
+  Enabled: false
+
+Style/FrozenStringLiteralComment:
+  EnforcedStyle: always
+
+Layout/LineLength:
+  Max: 170
+  Exclude:
+    - 'spec/**/*'
+
+# File naming - allow hyphenated gem name
+Naming/FileName:
+  Exclude:
+    - 'lib/client-api-builder.rb'
+
+# Allow short parameter names for unused exception variables
+Naming/MethodParameterName:
+  AllowedNames:
+    - e
+    - _e
+    - io
+
+# Gemspec settings
+Gemspec/RequiredRubyVersion:
+  Enabled: false
+
+# Style relaxations for existing code patterns
+Style/OptionalBooleanParameter:
+  Enabled: false
+
+Style/StringConcatenation:
+  Enabled: false
+
+Style/FormatStringToken:
+  Enabled: false
+
+# Allow class variables in Router module (used for namespaces)
+Style/ClassVars:
+  Exclude:
+    - 'lib/client_api_builder/router.rb'
+
+# Allow global $1 regex captures in code generation
+Style/PerlBackrefs:
+  Exclude:
+    - 'lib/client_api_builder/router.rb'
+
+# Allow rescuing Exception in specific files (intentional for retry logic)
+Lint/RescueException:
+  Exclude:
+    - 'lib/client_api_builder/router.rb'
+    - 'lib/client_api_builder/active_support_notifications.rb'

@@ -5,10 +5,11 @@ source 'http://rubygems.org'
 gem 'inheritance-helper'
 
 group :development do
-  gem 'rake'
-  gem 'rubocop'
   gem 'activesupport'
+  gem 'rake'
   gem 'rspec'
+  gem 'rubocop'
   gem 'simplecov'
+  gem 'simplecov-cobertura'
   gem 'webmock'
 end
