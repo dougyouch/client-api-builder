@@ -295,8 +295,8 @@ describe ClientApiBuilder::Router do
       <<-CODE
 def create_user_raw_response(app_id:, auth:, name:, email:, **__options__, &block)
   __path__ = "/v2/apps/\#{escape_path(app_id)}/users"
-  __query__ = {:auth=>auth}
-  __body__ = {:user=>{:name=>name, :email=>email}}
+  __query__ = {auth: auth}
+  __body__ = {user: {name: name, email: email}}
   __uri__ = build_uri(__path__, __query__, __options__)
   __body__ = build_body(__body__, __options__)
   __headers__ = build_headers(__options__)
@@ -330,7 +330,7 @@ CODE
         <<-CODE
 def get_user_raw_response(app_id:, user_id:, auth:, **__options__, &block)
   __path__ = "/v2/apps/\#{escape_path(app_id)}/users/\#{escape_path(user_id)}"
-  __query__ = {:auth=>auth}
+  __query__ = {auth: auth}
   __body__ = nil
   __uri__ = build_uri(__path__, __query__, __options__)
   __body__ = build_body(__body__, __options__)

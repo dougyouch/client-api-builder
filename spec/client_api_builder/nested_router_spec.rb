@@ -103,7 +103,7 @@ describe ClientApiBuilder::NestedRouter do
 def create_session_raw_response(username:, password:, **__options__, &block)
   __path__ = "/sessions"
   __query__ = nil
-  __body__ = {:username=>username, :password=>password}
+  __body__ = {username: username, password: password}
   __uri__ = build_uri(__path__, __query__, __options__)
   __body__ = build_body(__body__, __options__)
   __headers__ = build_headers(__options__)
