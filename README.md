@@ -1,19 +1,22 @@
 # Client API Builder
 
-A Ruby gem that provides a simple and elegant way to create API clients through configuration. It allows you to define API endpoints and their behavior declaratively, making it easy to create and maintain API clients.
+[![Gem Version](https://badge.fury.io/rb/client-api-builder.svg)](https://badge.fury.io/rb/client-api-builder)
+[![CI](https://github.com/dougyouch/client-api-builder/actions/workflows/ci.yml/badge.svg)](https://github.com/dougyouch/client-api-builder/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/dougyouch/client-api-builder/branch/master/graph/badge.svg)](https://codecov.io/gh/dougyouch/client-api-builder)
+
+A Ruby gem for building robust, secure API clients through declarative configuration. Define your API endpoints and their behavior with minimal boilerplate while benefiting from built-in security features, automatic retries, and comprehensive error handling.
 
 ## Features
 
-- Declarative API client configuration
-- Support for different request body formats (JSON, query params)
-- Customizable headers
-- Nested routing support
-- ActiveSupport integration for logging and notifications
-- Error handling with detailed response information
-- Flexible parameter handling
-- Automatic HTTP method detection based on method names
-- Streaming support for handling large payloads
-- Built-in debugging capabilities
+- **Declarative Configuration** - Define API endpoints with a clean DSL
+- **Security by Default** - SSL/TLS verification, path traversal protection, SSRF prevention
+- **Automatic HTTP Method Detection** - Intelligently determines HTTP methods from route names
+- **Flexible Request Building** - Support for JSON, query params, and custom body builders
+- **Nested Routing** - Organize complex APIs with hierarchical route structures
+- **Retry Logic** - Configurable automatic retries for transient network failures
+- **Streaming Support** - Handle large payloads efficiently with streaming to files or IO
+- **ActiveSupport Integration** - Optional logging and instrumentation
+- **Comprehensive Error Handling** - Detailed error information for debugging
 
 ## Installation
 
@@ -29,242 +32,511 @@ And then execute:
 $ bundle install
 ```
 
-Or install it yourself as:
+Or install it yourself:
 
 ```bash
 $ gem install client-api-builder
 ```
 
-## Usage
-
-### Basic Usage
-
-Create an API client by including the `ClientApiBuilder::Router` module and defining your endpoints:
+## Quick Start
 
 ```ruby
-class MyApiClient
+class GitHubClient
   include ClientApiBuilder::Router
 
-  # Set the base URL for all requests
-  base_url 'https://api.example.com'
+  base_url 'https://api.github.com'
 
-  # Set default headers
-  header 'Content-Type', 'application/json'
-  header 'Accept', 'application/json'
+  header 'Accept', 'application/vnd.github.v3+json'
+  header 'User-Agent', 'MyApp/1.0'
 
-  # Define an endpoint
-  route :get_user, '/users/:id', method: :get, expected_response_code: 200
-  route :create_user, '/users', method: :post, expected_response_code: 201, body: { name: :name, email: :email }
+  # Authentication header from instance method
+  header 'Authorization' do
+    "Bearer #{access_token}"
+  end
+
+  attr_accessor :access_token
+
+  # GET /users/:username
+  route :get_user, '/users/:username'
+
+  # GET /users/:username/repos
+  route :get_repos, '/users/:username/repos', query: { per_page: :per_page }
+
+  # POST /user/repos
+  route :create_repo, '/user/repos', body: { name: :name, private: :private }
 end
 
-# Use the client
-client = MyApiClient.new
-user = client.get_user(id: 123)
-new_user = client.create_user(name: 'John', email: 'john@example.com')
+client = GitHubClient.new
+client.access_token = 'ghp_xxxxxxxxxxxx'
+
+# Fetch a user
+user = client.get_user(username: 'octocat')
+
+# List repositories with pagination
+repos = client.get_repos(username: 'octocat', per_page: 10)
+
+# Create a new repository
+new_repo = client.create_repo(name: 'my-new-repo', private: true)
 ```
+
+## Usage Guide
+
+### Defining Routes
+
+Routes are defined using the `route` class method:
+
+```ruby
+route :method_name, '/path/:param', options
+```
+
+**Options:**
+
+| Option | Description |
+|--------|-------------|
+| `method:` | HTTP method (`:get`, `:post`, `:put`, `:patch`, `:delete`). Auto-detected if omitted. |
+| `query:` | Hash defining query parameters. Use symbols for dynamic values. |
+| `body:` | Hash defining request body. Use symbols for dynamic values. |
+| `expected_response_code:` | Single expected HTTP status code |
+| `expected_response_codes:` | Array of expected HTTP status codes |
+| `stream:` | Enable streaming (`:file`, `:io`, `:block`, or `true`) |
+| `return:` | Return type (`:response`, `:body`, or parsed JSON by default) |
 
 ### Automatic HTTP Method Detection
 
-The Router automatically detects the HTTP method based on the method name if not explicitly specified. This makes your API client code more intuitive and reduces boilerplate. The detection rules are:
+The Router automatically detects HTTP methods based on route names:
 
-- Methods starting with `post`, `create`, `add`, or `insert` → `POST`
-- Methods starting with `put`, `update`, `modify`, or `change` → `PUT`
-- Methods starting with `patch` → `PATCH`
-- Methods starting with `delete` or `remove` → `DELETE`
-- All other methods → `GET`
-
-Example:
+| Prefix | HTTP Method |
+|--------|-------------|
+| `get_`, `find_`, `fetch_`, `list_`, `search_` | GET |
+| `post_`, `create_`, `add_`, `insert_` | POST |
+| `put_`, `update_`, `modify_`, `change_` | PUT |
+| `patch_` | PATCH |
+| `delete_`, `remove_`, `destroy_` | DELETE |
 
 ```ruby
 class MyApiClient
   include ClientApiBuilder::Router
-  
+
   base_url 'https://api.example.com'
-  
-  # These will automatically use the appropriate HTTP methods
-  route :get_users, '/users'  # Uses GET
-  route :create_user, '/users', body: { name: :name }  # Uses POST
-  route :update_user, '/users/:id', body: { name: :name }  # Uses PUT
-  route :delete_user, '/users/:id'  # Uses DELETE
-  
-  # You can still explicitly specify the method if needed
-  route :custom_action, '/custom', method: :post
+
+  # Automatically uses appropriate HTTP methods
+  route :get_users, '/users'                    # GET
+  route :create_user, '/users', body: { name: :name }  # POST
+  route :update_user, '/users/:id', body: { name: :name }  # PUT
+  route :patch_user, '/users/:id', body: { name: :name }   # PATCH
+  route :delete_user, '/users/:id'              # DELETE
+end
+```
+
+### Dynamic Parameters
+
+Parameters can be defined in three ways:
+
+**1. Path Parameters** (using `:param` or `{param}` syntax):
+
+```ruby
+route :get_user, '/users/:id'
+route :get_post, '/users/{user_id}/posts/{post_id}'
+```
+
+**2. Query Parameters:**
+
+```ruby
+route :search_users, '/users', query: { q: :query, page: :page, limit: :limit }
+# Generates: GET /users?q=...&page=...&limit=...
+```
+
+**3. Body Parameters:**
+
+```ruby
+route :create_user, '/users', body: { user: { name: :name, email: :email } }
+# Sends JSON: {"user": {"name": "...", "email": "..."}}
+```
+
+### Headers
+
+Define headers at the class level or dynamically:
+
+```ruby
+class MyApiClient
+  include ClientApiBuilder::Router
+
+  base_url 'https://api.example.com'
+
+  # Static header
+  header 'Content-Type', 'application/json'
+
+  # Dynamic header from instance method
+  header 'Authorization', :auth_header
+
+  # Dynamic header from block
+  header 'X-Request-ID' do
+    SecureRandom.uuid
+  end
+
+  attr_accessor :api_key
+
+  def auth_header
+    "Bearer #{api_key}"
+  end
 end
 ```
 
 ### Request Body Formats
 
-By default, the client converts the body data to JSON. To use query parameters instead:
+Configure how request bodies are serialized:
 
 ```ruby
 class MyApiClient
   include ClientApiBuilder::Router
-  
-  # Use query parameters for the body
+
+  # Default: JSON (using to_json)
+  body_builder :to_json
+
+  # URL-encoded form data (using to_query)
+  body_builder :to_query
+
+  # Custom query params builder (no ActiveSupport dependency)
   body_builder :query_params
-  
-  base_url 'https://api.example.com'
-  
-  route :search, '/search', body: { q: :query, page: :page }
+
+  # Custom builder method
+  body_builder :my_custom_builder
+
+  # Custom builder with block
+  body_builder do |data|
+    data.to_xml
+  end
+
+  def my_custom_builder(data)
+    # Custom serialization logic
+  end
 end
 ```
 
-### Nested Routing
+### Nested Routing (Sections)
 
-For APIs with nested resources, you can use the `NestedRouter`:
+Organize complex APIs with nested routes:
 
 ```ruby
 class MyApiClient
   include ClientApiBuilder::Router
-  
+
   base_url 'https://api.example.com'
-  
+  header 'Authorization', :auth_token
+
+  attr_accessor :auth_token
+
   section :users do
-    route :list, '/', method: :get
-    route :get, '/:id', method: :get
+    base_url 'https://api.example.com/v2'  # Override base URL
+
+    route :list, '/users'
+    route :get, '/users/:id'
+    route :create, '/users', body: { name: :name, email: :email }
+  end
+
+  section :posts do
+    route :list, '/posts'
+    route :get, '/posts/:id'
   end
 end
 
 client = MyApiClient.new
+client.auth_token = 'secret'
+
+# Access nested routes
 users = client.users.list
 user = client.users.get(id: 123)
+posts = client.posts.list
 ```
 
-### Error Handling
+### Connection Options
 
-The gem provides custom error classes for better error handling:
+Configure connection settings:
 
 ```ruby
-begin
-  client.get_user(id: 123)
-rescue ClientApiBuilder::UnexpectedResponse => e
-  puts "Request failed with status #{e.response.status}"
-  puts "Response body: #{e.response.body}"
+class MyApiClient
+  include ClientApiBuilder::Router
+
+  base_url 'https://api.example.com'
+
+  # Set timeouts
+  connection_option :open_timeout, 10
+  connection_option :read_timeout, 30
+
+  # SSL options (verify_mode is enabled by default)
+  connection_option :ssl_timeout, 10
 end
 ```
 
-### ActiveSupport Integration
+### Retry Configuration
 
-The gem integrates with ActiveSupport for logging and notifications:
+Configure automatic retries for transient failures:
 
 ```ruby
-# Enable logging
-ClientApiBuilder.logger = Logger.new(STDOUT)
+class MyApiClient
+  include ClientApiBuilder::Router
 
-# Subscribe to notifications
-ActiveSupport::Notifications.subscribe('request.client_api_builder') do |*args|
-  event = ActiveSupport::Notifications::Event.new(*args)
-  puts "Request took #{event.duration}ms"
+  base_url 'https://api.example.com'
+
+  # Retry up to 3 times with 0.5 second delay between attempts
+  configure_retries 3, 0.5
+end
+```
+
+By default, retries are performed only for network-related errors:
+- `Net::OpenTimeout`, `Net::ReadTimeout`
+- `Errno::ECONNRESET`, `Errno::ECONNREFUSED`, `Errno::ETIMEDOUT`
+- `SocketError`, `EOFError`
+
+Customize retry behavior by overriding `retry_request?`:
+
+```ruby
+class MyApiClient
+  include ClientApiBuilder::Router
+
+  def retry_request?(exception, options)
+    case exception
+    when Net::OpenTimeout, Net::ReadTimeout
+      true
+    when ClientApiBuilder::UnexpectedResponse
+      # Retry on 503 Service Unavailable
+      exception.response.code == '503'
+    else
+      false
+    end
+  end
 end
 ```
 
 ### Streaming Support
 
-The library supports streaming responses, which is particularly useful for handling large payloads. You can stream responses directly to a file or process them in chunks:
+Handle large responses efficiently:
 
 ```ruby
 class MyApiClient
   include ClientApiBuilder::Router
-  
+
   base_url 'https://api.example.com'
-  
-  # Stream response directly to a file
-  route :download_users, '/users', stream: :file
-  
-  # Stream response in chunks for custom processing
-  route :stream_users, '/users', stream: true
+
+  # Stream directly to a file
+  route :download_file, '/files/:id/download', stream: :file
+
+  # Stream to an IO object
+  route :stream_to_io, '/files/:id/stream', stream: :io
+
+  # Stream with block processing
+  route :process_stream, '/events/stream', stream: :block
 end
 
-# Use the client
 client = MyApiClient.new
 
-# Stream to file
-client.download_users('users.json')  # Saves response directly to users.json
+# Download to file
+client.download_file(id: 123, file: '/path/to/output.zip')
 
-# Stream with custom processing
-client.stream_users do |chunk|
-  # Process each chunk of the response
+# Stream to IO
+File.open('/path/to/output.dat', 'wb') do |file|
+  client.stream_to_io(id: 123, io: file)
+end
+
+# Process stream in chunks
+client.process_stream do |response, chunk|
   puts "Received #{chunk.bytesize} bytes"
+  process_data(chunk)
 end
 ```
 
-When using `stream: :file`, the response is written directly to disk as it's received, which is memory-efficient for large responses. The file path is passed as an argument to the method.
+### Response Handling
 
-For custom streaming, you can provide a block that will be called with each chunk of the response as it's received. This allows for custom processing of large responses without loading the entire response into memory.
+Customize how responses are processed:
 
-### Thread Safety
+```ruby
+class MyApiClient
+  include ClientApiBuilder::Router
 
-The library is not thread-safe. You must create a separate client instance per thread to avoid race conditions and ensure proper operation:
+  base_url 'https://api.example.com'
+
+  # Return parsed JSON (default)
+  route :get_user, '/users/:id'
+
+  # Return raw response body
+  route :get_raw, '/raw/:id', return: :body
+
+  # Return Net::HTTPResponse object
+  route :get_response, '/data/:id', return: :response
+
+  # Custom response handling with block
+  route :get_token, '/auth/token' do |data|
+    self.auth_token = data['access_token']
+    data
+  end
+end
+```
+
+### Error Handling
+
+The gem provides detailed error information:
+
+```ruby
+begin
+  client.get_user(id: 999)
+rescue ClientApiBuilder::UnexpectedResponse => e
+  puts "HTTP Status: #{e.response.code}"
+  puts "Response Body: #{e.response.body}"
+  puts "Error Message: #{e.message}"
+end
+```
+
+### Debugging
+
+Access request and response details after each call:
+
+```ruby
+client = MyApiClient.new
+client.get_user(id: 123)
+
+# Response information
+puts client.response.code        # HTTP status code
+puts client.response.body        # Response body
+puts client.response.to_hash     # Response headers
+
+# Request information
+puts client.request_options[:method]  # HTTP method used
+puts client.request_options[:uri]     # Full URI
+puts client.request_options[:body]    # Request body
+puts client.request_options[:headers] # Request headers
+
+# Performance metrics
+puts client.total_request_time   # Time in seconds
+puts client.request_attempts     # Number of attempts (including retries)
+```
+
+### ActiveSupport Integration
+
+When ActiveSupport is available, the gem provides instrumentation and logging:
+
+```ruby
+# Set up logging
+ClientApiBuilder.logger = Logger.new(STDOUT)
+
+# Subscribe to request events
+ActiveSupport::Notifications.subscribe('client_api_builder.request') do |*args|
+  event = ActiveSupport::Notifications::Event.new(*args)
+  client = event.payload[:client]
+
+  puts "#{client.request_options[:method]} #{client.request_options[:uri]}"
+  puts "Status: #{client.response&.code}"
+  puts "Duration: #{event.duration.round(2)}ms"
+end
+
+# Or use the built-in log subscriber
+subscriber = ClientApiBuilder::ActiveSupportLogSubscriber.new(Rails.logger)
+subscriber.subscribe!
+```
+
+## Security Features
+
+Client API Builder includes several security features enabled by default:
+
+### SSL/TLS Verification
+
+All HTTPS connections verify SSL certificates by default using `OpenSSL::SSL::VERIFY_PEER`. Default timeouts are also configured to prevent hanging connections.
+
+### SSRF Protection
+
+Base URLs are validated to only allow `http` and `https` schemes, preventing Server-Side Request Forgery attacks:
+
+```ruby
+class MyApiClient
+  include ClientApiBuilder::Router
+
+  base_url 'https://api.example.com'  # Valid
+  base_url 'http://api.example.com'   # Valid
+  base_url 'file:///etc/passwd'       # Raises ArgumentError
+  base_url 'ftp://example.com'        # Raises ArgumentError
+end
+```
+
+### Path Traversal Protection
+
+File streaming operations validate paths to prevent directory traversal attacks:
+
+```ruby
+# These will raise ArgumentError
+client.download_file(id: 1, file: '/tmp/../etc/passwd')
+client.download_file(id: 1, file: "/tmp/file\0.txt")
+```
+
+### Safe File Modes
+
+Only safe file modes are allowed for streaming to files: `w`, `wb`, `a`, `ab`, `w+`, `wb+`, `a+`, `ab+`.
+
+## Thread Safety
+
+Client instances are **not thread-safe**. Create a separate client instance per thread:
 
 ```ruby
 # Correct: Create a new client for each thread
-threads = []
-5.times do |i|
-  threads << Thread.new do
+threads = 5.times.map do |i|
+  Thread.new do
     client = MyApiClient.new
     client.get_user(id: i)
   end
 end
 threads.each(&:join)
 
-# Incorrect: Do not share a single client across threads
+# Incorrect: Do not share clients across threads
 client = MyApiClient.new
-threads = []
-5.times do |i|
-  threads << Thread.new do
-    client.get_user(id: i)  # This will cause race conditions
+threads = 5.times.map do |i|
+  Thread.new do
+    client.get_user(id: i)  # Race condition!
   end
 end
-threads.each(&:join)
 ```
 
-Each client instance maintains its own state, including response objects and request options. Sharing a client across threads can lead to unpredictable behavior and race conditions.
+## Configuration Reference
 
-### Debugging
+### Class-Level Methods
 
-The Router provides built-in debugging capabilities by maintaining the response object and request options for each request. This information can be accessed after making a request:
+| Method | Description |
+|--------|-------------|
+| `base_url(url)` | Set the base URL for all requests |
+| `header(name, value)` | Add a header to all requests |
+| `body_builder(builder)` | Configure request body serialization |
+| `query_builder(builder)` | Configure query string serialization |
+| `query_param(name, value)` | Add a query parameter to all requests |
+| `connection_option(name, value)` | Set Net::HTTP connection options |
+| `configure_retries(max, sleep)` | Configure retry behavior |
+| `route(name, path, options)` | Define an API endpoint |
+| `section(name, options, &block)` | Define nested routes |
+| `namespace(path, &block)` | Add path prefix to routes in block |
 
-```ruby
-client = MyApiClient.new
-client.get_user(id: 123)
+### Instance Methods
 
-# Access the last response
-response = client.response
-puts "Status: #{response.status}"
-puts "Headers: #{response.headers}"
-puts "Body: #{response.body}"
+| Method | Description |
+|--------|-------------|
+| `response` | Last Net::HTTPResponse object |
+| `request_options` | Options used for last request |
+| `total_request_time` | Duration of last request in seconds |
+| `request_attempts` | Number of attempts for last request |
+| `root_router` | Returns the root router (for nested routers) |
 
-# Access the request options used
-request_options = client.request_options
-puts "Method: #{request_options[:method]}"
-puts "URL: #{request_options[:url]}"
-puts "Headers: #{request_options[:headers]}"
-puts "Body: #{request_options[:body]}"
+## Requirements
 
-# Access timing information
-puts "Total request time: #{client.total_request_time} seconds"
-puts "Number of attempts: #{client.request_attempts}"
-```
-
-This information is particularly useful for:
-- Debugging failed requests
-- Understanding request/response cycles
-- Performance analysis
-- Logging and monitoring
-
-The response and request options are maintained until the next request is made, so you can inspect them immediately after a request completes.
-
-## Configuration Options
-
-- `base_url`: Set the base URL for all requests
-- `header`: Add headers to all requests
-- `body_builder`: Configure how request bodies are formatted
-- `route`: Define API endpoints with their paths and parameters
-- `section`: Define nested resource routes
+- Ruby 3.0+
+- `inheritance-helper` gem (>= 0.2.5)
 
 ## Contributing
 
 Bug reports and pull requests are welcome on GitHub at https://github.com/dougyouch/client-api-builder.
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/my-feature`)
+3. Write tests for your changes
+4. Ensure all tests pass (`bundle exec rspec`)
+5. Ensure code style compliance (`bundle exec rubocop`)
+6. Commit your changes (`git commit -am 'Add my feature'`)
+7. Push to the branch (`git push origin feature/my-feature`)
+8. Create a Pull Request
 
 ## License
 
