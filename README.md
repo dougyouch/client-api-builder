@@ -433,6 +433,28 @@ subscriber = ClientApiBuilder::ActiveSupportLogSubscriber.new(Rails.logger)
 subscriber.subscribe!
 ```
 
+#### Production Logging
+
+For production environments, it's important to log requests without exposing sensitive credentials that may be present in query parameters. The following example strips query parameters from logged URLs:
+
+```ruby
+ActiveSupport::Notifications.subscribe('client_api_builder.request') do |_, start_time, end_time, _, payload|
+  client = payload[:client]
+  method = client.request_options[:method].to_s.upcase
+  uri = client.request_options[:uri]
+  response_code = client.response ? client.response.code : 'UNKNOWN'
+
+  duration = ((end_time - start_time) * 1000).to_i
+  Rails.logger.info "#{method} #{uri.scheme}://#{uri.host}#{uri.path}[#{response_code}] took #{duration}ms"
+end
+```
+
+This produces clean log entries like:
+```
+GET https://api.example.com/users/123[200] took 45ms
+POST https://api.example.com/auth/token[201] took 120ms
+```
+
 ## Security Features
 
 Client API Builder includes several security features enabled by default:
