@@ -282,10 +282,37 @@ module ClientApiBuilder
         [path, path_arguments]
       end
 
+      # Converts a value to Ruby code string with consistent hash syntax across Ruby versions.
+      # Uses modern {key: value} syntax for symbol keys.
+      def value_to_code(value)
+        case value
+        when Hash
+          return '{}' if value.empty?
+
+          pairs = value.map do |k, v|
+            key_code = case k
+                       when Symbol then "#{k}: "
+                       when String then "#{k.inspect} => "
+                       else "#{value_to_code(k)} => "
+                       end
+            "#{key_code}#{value_to_code(v)}"
+          end
+          "{#{pairs.join(', ')}}"
+        when Array
+          "[#{value.map { |v| value_to_code(v) }.join(', ')}]"
+        when NilClass
+          'nil'
+        when TrueClass, FalseClass
+          value.to_s
+        else
+          value.inspect
+        end
+      end
+
       def build_query_code(options)
         if options[:query]
           query_arguments = get_arguments(options[:query])
-          str = options[:query].inspect
+          str = value_to_code(options[:query])
           str = str.gsub(/"__\|\|(.+?)\|\|__"/) { Regexp.last_match(1) }
           [str, query_arguments.map(&:to_s)]
         else
@@ -296,7 +323,7 @@ module ClientApiBuilder
       def build_body_code(options, has_body_param)
         if options[:body]
           body_arguments = get_arguments(options[:body])
-          str = options[:body].inspect
+          str = value_to_code(options[:body])
           str = str.gsub(/"__\|\|(.+?)\|\|__"/) { Regexp.last_match(1) }
           [str, body_arguments.map(&:to_s), false]
         else
