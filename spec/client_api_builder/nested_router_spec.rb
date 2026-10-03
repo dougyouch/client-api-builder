@@ -15,6 +15,7 @@ describe ClientApiBuilder::NestedRouter do
       connection_option :open_timeout, 100
       base_url 'http://api.example.com'
       header 'Content-Type', 'application/json'
+      header 'X-Root-Only', 'root'
       query_param 'cachebuster', 1
 
       section :login do
@@ -31,7 +32,7 @@ describe ClientApiBuilder::NestedRouter do
         route :get_profile, '/profiles/{auth_token}'
       end
 
-      section(:auth, ignore_headers: true, ignore_query: true) do
+      section :auth do
         connection_option :open_timeout, 1000
         header 'Content-Type', 'application/json'
         header 'X-AuthType', 'JSON'
@@ -76,7 +77,7 @@ describe ClientApiBuilder::NestedRouter do
       expect(router.auth_token).to eq(expected_auth_token)
     }
 
-    describe 'ignore_headers' do
+    describe 'a section without the root\'s headers or query params' do
       subject { router.auth.create_session(username: username, password: password) }
 
       let(:expected_auth_token) { SecureRandom.uuid }
@@ -101,6 +102,14 @@ describe ClientApiBuilder::NestedRouter do
         subject
         expect(router.auth_token).to eq(expected_auth_token)
       }
+
+      it 'sends only its own headers, connection options and query params' do
+        subject
+
+        expect(router.auth.request_options[:headers]).to eq('Content-Type' => 'application/json', 'X-AuthType' => 'JSON')
+        expect(router.auth.request_options[:connection_options]).to eq(open_timeout: 1000)
+        expect(router.auth.request_options[:uri].query).to be_nil
+      end
     end
 
     describe 'code' do
