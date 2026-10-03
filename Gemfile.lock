@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    client-api-builder (0.7.1)
+    client-api-builder (0.7.2)
       inheritance-helper (>= 0.2.5)
 
 GEM
