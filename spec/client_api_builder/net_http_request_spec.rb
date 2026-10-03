@@ -3,6 +3,7 @@
 require 'spec_helper'
 require 'stringio'
 require 'tempfile'
+require 'tmpdir'
 
 describe ClientApiBuilder::NetHTTP::Request do
   let(:test_class) do
@@ -38,7 +39,54 @@ describe ClientApiBuilder::NetHTTP::Request do
     let(:connection_options) { {} }
 
     before do
-      allow(instance).to receive(:stream_to_io)
+      stub_request(:get, 'http://example.com/file').to_return(status: 200, body: 'data')
+    end
+
+    context 'with validate_response' do
+      let(:reject) { ->(response) { raise ClientApiBuilder::UnexpectedResponse.new('rejected', response) } }
+      let(:path) { File.join(Dir.mktmpdir, 'download.bin') }
+
+      before { stub_request(:get, 'http://example.com/file').to_return(status: 404, body: 'not found page') }
+
+      it 'leaves an existing file untouched when the response is rejected' do
+        File.write(path, 'existing contents')
+
+        expect do
+          instance.stream_to_file(method: method, uri: uri, body: body, headers: headers,
+                                  connection_options: { file_mode: 'ab' }, file: path, validate_response: reject)
+        end.to raise_error(ClientApiBuilder::UnexpectedResponse) { |error| expect(error.response.body).to eq('not found page') }
+        expect(File.read(path)).to eq('existing contents')
+      end
+
+      it 'does not create the file when the response is rejected' do
+        expect do
+          instance.stream_to_file(method: method, uri: uri, body: body, headers: headers,
+                                  connection_options: {}, file: path, validate_response: reject)
+        end.to raise_error(ClientApiBuilder::UnexpectedResponse)
+        expect(File).not_to exist(path)
+      end
+
+      it 'writes the file when the response is accepted' do
+        stub_request(:get, 'http://example.com/file').to_return(status: 200, body: 'data')
+
+        response = instance.stream_to_file(method: method, uri: uri, body: body, headers: headers,
+                                           connection_options: {}, file: path, validate_response: ->(_) {})
+        expect(File.read(path)).to eq('data')
+        expect(response).to be_a(Net::HTTPOK)
+      end
+    end
+
+    context 'with an empty response body' do
+      let(:path) { File.join(Dir.mktmpdir, 'download.bin') }
+
+      before { stub_request(:get, 'http://example.com/file').to_return(status: 200, body: '') }
+
+      it 'still creates or truncates the file' do
+        File.write(path, 'old contents')
+
+        instance.stream_to_file(method: method, uri: uri, body: body, headers: headers, connection_options: {}, file: path)
+        expect(File.read(path)).to eq('')
+      end
     end
 
     context 'with valid file mode' do
@@ -188,6 +236,51 @@ describe ClientApiBuilder::NetHTTP::Request do
       instance.stream_to_io(method: :get, uri: uri, body: nil, headers: {}, connection_options: {}, io: io)
 
       expect(io.string).to eq('file contents')
+    end
+
+    it 'writes nothing when validate_response rejects the response' do
+      io = StringIO.new
+      reject = ->(_) { raise ArgumentError, 'rejected' }
+
+      expect do
+        instance.stream_to_io(method: :get, uri: uri, body: nil, headers: {}, connection_options: {}, io: io,
+                              validate_response: reject)
+      end.to raise_error(ArgumentError, 'rejected')
+      expect(io.string).to eq('')
+    end
+  end
+
+  describe '#stream' do
+    let(:uri) { URI('http://example.com/file') }
+
+    before do
+      stub_request(:get, 'http://example.com/file').to_return(status: 503, body: 'try later')
+    end
+
+    it 'passes the response to validate_response before streaming' do
+      seen = nil
+      chunks = []
+      instance.stream(method: :get, uri: uri, body: nil, headers: {}, connection_options: {},
+                      validate_response: ->(response) { seen = response.code }) { |_, chunk| chunks << chunk }
+
+      expect(seen).to eq('503')
+      expect(chunks).to eq(['try later'])
+    end
+
+    it 'reads a rejected body into the response instead of streaming it' do
+      chunks = []
+      rejected = nil
+      reject = lambda do |response|
+        rejected = response
+        raise ArgumentError, 'rejected'
+      end
+
+      expect do
+        instance.stream(method: :get, uri: uri, body: nil, headers: {}, connection_options: {},
+                        validate_response: reject) { |_, chunk| chunks << chunk }
+      end.to raise_error(ArgumentError)
+      expect(chunks).to be_empty
+      expect(rejected.body).to eq('try later')
     end
   end
 end

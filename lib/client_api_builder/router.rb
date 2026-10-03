@@ -373,16 +373,24 @@ module ClientApiBuilder
         args + ['**__options__', '&block']
       end
 
-      def generate_request_call_code(options, stream_param)
+      def generate_request_call_code(options, stream_param, expected_response_codes)
         code = "  @request_options[:#{stream_param}] = #{stream_param}\n" if stream_param
         code ||= ''
+        validator = stream_validator_code(expected_response_codes)
 
         code + case options[:stream]
-               when true, :file then "  @response = stream_to_file(**@request_options)\n"
-               when :io then "  @response = stream_to_io(**@request_options)\n"
-               when :block then "  @response = stream(**@request_options, &block)\n"
+               when true, :file then "  @response = stream_to_file(**@request_options, #{validator})\n"
+               when :io then "  @response = stream_to_io(**@request_options, #{validator})\n"
+               when :block then "  @response = stream(**@request_options, #{validator}, &block)\n"
                else "  @response = request(**@request_options)\n"
                end
+      end
+
+      # Streaming routes check the status before the body is streamed, using the same
+      # expected_response_code! as other routes, so error bodies never reach the file, IO or block
+      def stream_validator_code(expected_response_codes)
+        'validate_response: ->(response) { ' \
+          "expected_response_code!(response, #{expected_response_codes.inspect}, __options__) }"
       end
 
       def generate_response_handling_code(options)
@@ -434,7 +442,7 @@ module ClientApiBuilder
         code += "  __connection_options__ = build_connection_options(__options__)\n"
         code += "  @request_options = {method: #{ctx[:http_method].inspect}, uri: __uri__, body: __body__, " \
                 "headers: __headers__, connection_options: __connection_options__}\n"
-        code += generate_request_call_code(ctx[:options], ctx[:stream_param])
+        code += generate_request_call_code(ctx[:options], ctx[:stream_param], ctx[:expected_response_codes])
         "#{code}end\n\n"
       end
 

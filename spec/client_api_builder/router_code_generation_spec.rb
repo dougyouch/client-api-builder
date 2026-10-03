@@ -177,7 +177,8 @@ describe ClientApiBuilder::Router do
       it 'streams to a file' do
         expect(code).to include('def download_raw_response(id:, file:, **__options__, &block)')
         expect(code).to include('@request_options[:file] = file')
-        expect(code).to include('@response = stream_to_file(**@request_options)')
+        expect(code).to include('@response = stream_to_file(**@request_options, validate_response: ->(response) { ' \
+                                'expected_response_code!(response, [], __options__) })')
         expect(code).to include("    @response\n")
       end
     end
@@ -187,7 +188,8 @@ describe ClientApiBuilder::Router do
 
       it 'streams to an IO' do
         expect(code).to include('@request_options[:io] = io')
-        expect(code).to include('@response = stream_to_io(**@request_options)')
+        expect(code).to include('@response = stream_to_io(**@request_options, validate_response: ->(response) { ' \
+                                'expected_response_code!(response, [], __options__) })')
       end
     end
 
@@ -196,7 +198,8 @@ describe ClientApiBuilder::Router do
 
       it 'streams to the block' do
         expect(code).to include('def download_raw_response(id:, **__options__, &block)')
-        expect(code).to include('@response = stream(**@request_options, &block)')
+        expect(code).to include('@response = stream(**@request_options, validate_response: ->(response) { ' \
+                                'expected_response_code!(response, [], __options__) }, &block)')
       end
     end
 

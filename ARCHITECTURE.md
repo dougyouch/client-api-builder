@@ -133,9 +133,11 @@ Provides HTTP request execution using Net::HTTP:
 
 **Methods**:
 - `request(method:, uri:, body:, headers:, connection_options:)` - Standard request with optional block
-- `stream(...)` - Streams response body in chunks via `read_body`
-- `stream_to_io(..., io:)` - Writes streamed chunks to an IO object
-- `stream_to_file(..., file:)` - Opens file and streams to it
+- `stream(..., validate_response: nil)` - Streams response body in chunks via `read_body`
+- `stream_to_io(..., io:, validate_response: nil)` - Writes streamed chunks to an IO object
+- `stream_to_file(..., file:, validate_response: nil)` - Opens the file once the response is accepted and streams to it
+
+`validate_response` is a callable run with the response before any of the body is read; it rejects the response by raising. The rejected body is read into `response.body` so the error can show it. Streaming routes pass `->(response) { expected_response_code!(response, codes, __options__) }`, so streaming follows the same status rules (and any `expected_response_code!` override) as other routes.
 
 **Supported HTTP Methods** (via `METHOD_TO_NET_HTTP_CLASS`):
 `copy`, `delete`, `get`, `head`, `lock`, `mkcol`, `move`, `options`, `patch`, `post`, `propfind`, `proppatch`, `put`, `trace`, `unlock`
@@ -231,7 +233,7 @@ route :process, '/data', stream: :block    # stream with block for each chunk
 route :download, '/file', stream: true     # alias for :file
 ```
 
-`stream_to_file` takes the file mode from the `:file_mode` connection option (default `wb`, limited to `ALLOWED_FILE_MODES`) and rejects paths containing `..` or a null byte. Streaming routes return the `Net::HTTPResponse`.
+`stream_to_file` takes the file mode from the `:file_mode` connection option (default `wb`, limited to `ALLOWED_FILE_MODES`) and rejects paths containing `..` or a null byte. It opens the file only after `validate_response` accepts the response, so an error never creates, truncates or appends to it. Streaming routes return the `Net::HTTPResponse`.
 
 ## Dependencies
 

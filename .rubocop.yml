@@ -27,9 +27,9 @@ Metrics/ParameterLists:
 Metrics/ClassLength:
   Max: 200
 
-# Router's ClassMethods holds the whole route DSL and code generator
+# Router's ClassMethods holds the whole route DSL and code generator (candidate for splitting out)
 Metrics/ModuleLength:
-  Max: 340
+  Max: 360
 
 Metrics/CyclomaticComplexity:
   Max: 12

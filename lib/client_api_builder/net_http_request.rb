@@ -50,46 +50,72 @@ module ClientApiBuilder
         end
       end
 
-      def stream(method:, uri:, body:, headers:, connection_options:)
+      # validate_response, when given, is called with the response before its body is streamed
+      # and raises to reject it. A rejected body is read into response.body instead of being
+      # streamed, so the error can still show it.
+      def stream(method:, uri:, body:, headers:, connection_options:, validate_response: nil)
         request(method: method, uri: uri, body: body, headers: headers,
                 connection_options: connection_options) do |response|
+          validate_streamed_response(response, validate_response) if validate_response
           response.read_body do |chunk|
             yield response, chunk
           end
         end
       end
 
-      def stream_to_io(method:, uri:, body:, headers:, connection_options:, io:)
+      def stream_to_io(method:, uri:, body:, headers:, connection_options:, io:, validate_response: nil)
         stream(method: method, uri: uri, body: body, headers: headers,
-               connection_options: connection_options) do |_, chunk|
+               connection_options: connection_options, validate_response: validate_response) do |_, chunk|
           io.write chunk
         end
       end
 
-      def stream_to_file(method:, uri:, body:, headers:, connection_options:, file:)
+      # The file is opened only once the response has passed validate_response, so a rejected
+      # response never creates, truncates or appends to it.
+      def stream_to_file(method:, uri:, body:, headers:, connection_options:, file:, validate_response: nil)
         # Use dup to avoid mutating the original hash
         opts = connection_options.dup
-        mode = opts.delete(:file_mode)
+        mode = stream_file_mode(opts.delete(:file_mode))
+        path = stream_file_path(file)
 
-        # Validate file mode - use whitelist approach
-        mode = if mode.nil?
-                 'wb'
-               elsif ALLOWED_FILE_MODES.include?(mode.to_s)
-                 mode.to_s
-               else
-                 raise ArgumentError,
-                       "Invalid file mode: #{mode.inspect}. Allowed modes: #{ALLOWED_FILE_MODES.join(', ')}"
-               end
+        io = nil
+        open_file = lambda do |response|
+          validate_response&.call(response)
+          io = File.open(path, mode) # rubocop:disable Style/FileOpen -- closed in ensure
+        end
+        stream(method: method, uri: uri, body: body, headers: headers,
+               connection_options: opts, validate_response: open_file) do |_, chunk|
+          io.write chunk
+        end
+      ensure
+        io&.close
+      end
 
-        # Validate file path - expand to absolute path and check for path traversal
+      private
+
+      def validate_streamed_response(response, validate_response)
+        validate_response.call(response)
+      rescue StandardError
+        response.read_body
+        raise
+      end
+
+      # Validate file mode - use whitelist approach
+      def stream_file_mode(mode)
+        return 'wb' if mode.nil?
+        return mode.to_s if ALLOWED_FILE_MODES.include?(mode.to_s)
+
+        raise ArgumentError, "Invalid file mode: #{mode.inspect}. Allowed modes: #{ALLOWED_FILE_MODES.join(', ')}"
+      end
+
+      # Validate file path - expand to absolute path and check for path traversal
+      def stream_file_path(file)
         expanded_path = File.expand_path(file)
         if file.to_s.include?('..') || expanded_path.include?("\0")
           raise ArgumentError, 'Invalid file path: potential path traversal detected'
         end
 
-        File.open(expanded_path, mode) do |io|
-          stream_to_io(method: method, uri: uri, body: body, headers: headers, connection_options: opts, io: io)
-        end
+        expanded_path
       end
     end
   end

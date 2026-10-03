@@ -321,6 +321,54 @@ describe ClientApiBuilder::Router do
     end
   end
 
+  describe 'streaming an error response' do
+    let(:router_class) do
+      Class.new do
+        include ClientApiBuilder::Router
+
+        base_url 'http://example.com'
+
+        route :download, '/file', stream: :file
+        route :download_io, '/file', stream: :io
+        route :download_chunks, '/file', stream: :block
+        route :download_partial, '/file', stream: :io, expected_response_code: 206
+      end
+    end
+
+    before { stub_request(:get, 'http://example.com/file').to_return(status: 404, body: 'not found page') }
+
+    it 'keeps an existing file and puts the error body on the exception' do
+      Tempfile.create('download') do |file|
+        File.write(file.path, 'existing contents')
+
+        expect { router.download(file: file.path) }.to raise_error(ClientApiBuilder::UnexpectedResponse) do |error|
+          expect(error.response.body).to eq('not found page')
+        end
+        expect(File.read(file.path)).to eq('existing contents')
+      end
+    end
+
+    it 'writes nothing to the IO' do
+      io = StringIO.new
+      expect { router.download_io(io: io) }.to raise_error(ClientApiBuilder::UnexpectedResponse)
+      expect(io.string).to eq('')
+    end
+
+    it 'yields nothing to the block' do
+      chunks = []
+      expect { router.download_chunks { |_, chunk| chunks << chunk } }.to raise_error(ClientApiBuilder::UnexpectedResponse)
+      expect(chunks).to be_empty
+    end
+
+    it 'uses the route\'s expected response codes' do
+      stub_request(:get, 'http://example.com/file').to_return(status: 200, body: 'whole file')
+      io = StringIO.new
+
+      expect { router.download_partial(io: io) }.to raise_error(ClientApiBuilder::UnexpectedResponse, /200/)
+      expect(io.string).to eq('')
+    end
+  end
+
   describe 'retries' do
     it 'retries network errors and succeeds' do
       stub_request(:get, 'http://example.com/items').to_timeout.then.to_return(body: '{"ok":true}')

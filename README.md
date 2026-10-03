@@ -422,6 +422,8 @@ end
 
 Streaming routes return the `Net::HTTPResponse`. Files are written in `wb` mode by default; pass `connection_options: { file_mode: 'ab' }` to append.
 
+The status is checked against the route's expected response codes before any of the body is streamed. An error response raises `UnexpectedResponse` with the error body in `e.response.body`, and nothing is written to the file, IO or block; an existing file is left untouched.
+
 ### Response Handling
 
 Customize how responses are processed:
