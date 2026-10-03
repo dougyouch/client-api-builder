@@ -19,6 +19,14 @@
 * **stream:** check the response status before streaming the body ([eeb9e3b](https://github.com/dougyouch/client-api-builder/commit/eeb9e3b3895f4571bff147e5f75695e4f7324868))
 * **stream:** reject only parent path segments in file names ([09c355d](https://github.com/dougyouch/client-api-builder/commit/09c355dc3c68dd06e07c8c9dfe003d7daf1153f6))
 
+### Upgrade Notes
+
+* Per-request `headers:` and `query:` values and route arguments are now sent as given. A Symbol there (e.g. `query: { order: :desc }`) is sent as the value `desc` instead of calling a method of that name. Symbols and blocks given to the class-level `header` and `query_param` are still resolved on the client.
+* HTTP method detection now needs the whole verb: route names where the verb runs into the next word (`posts`, `addresses`, `deleted_users`, `updates_feed`, `changelog`) now default to GET instead of POST, PUT or DELETE. Add `method:` to such routes to keep the old method.
+* Redefining a route without a block, in the same class or a subclass, no longer keeps the previous or inherited response block. Pass the block again to keep it.
+* A `:name` directly after a letter, digit, `_` or `}` is now literal path text, so `/v1/items:batchGet` works; a mid-word parameter such as `/items:id` no longer becomes an argument.
+* Route `query:`/`body:` values must be strings, numbers, booleans, `nil`, hashes or arrays. `Range`, `Regexp`, `BigDecimal`, `Complex`, `Time` and other objects now raise an `ArgumentError` naming the route when the class loads; write them as a string or use a `'{method}'` placeholder.
+
 ## [0.7.1](https://github.com/dougyouch/client-api-builder/compare/v0.7.0...v0.7.1) (2026-10-03)
 
 
