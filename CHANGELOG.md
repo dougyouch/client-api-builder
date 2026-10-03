@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.0](https://github.com/dougyouch/client-api-builder/compare/v0.7.2...v0.8.0) (2026-10-03)
+
+
+### Features
+
+* **section:** let sections inherit root client headers, query params and connection options ([8849d98](https://github.com/dougyouch/client-api-builder/commit/8849d9875c86633639bf33c5e9b1eb486f67e921))
+
 ## [0.7.2](https://github.com/dougyouch/client-api-builder/compare/v0.7.1...v0.7.2) (2026-10-03)
 
 
