@@ -94,25 +94,54 @@ route :method_name, '/path/:param', options
 
 | Option | Description |
 |--------|-------------|
-| `method:` | HTTP method (`:get`, `:post`, `:put`, `:patch`, `:delete`). Auto-detected if omitted. |
+| `method:` | HTTP method. Auto-detected from the route name if omitted. Any of `:get`, `:post`, `:put`, `:patch`, `:delete`, `:head`, `:options`, `:trace`, `:copy`, `:lock`, `:unlock`, `:mkcol`, `:move`, `:propfind`, `:proppatch`. |
 | `query:` | Hash defining query parameters. Use symbols for dynamic values. |
-| `body:` | Hash defining request body. Use symbols for dynamic values. |
-| `expected_response_code:` | Single expected HTTP status code |
+| `body:` | Request body: a Hash or Array (symbols become arguments) or a literal String. |
+| `no_body:` | `true` to send no body, even for POST/PUT/PATCH. |
+| `has_body:` | `true` to add a `body:` argument to any method, e.g. a GET with a body. |
+| `expected_response_code:` | Single expected HTTP status code. Without one, any 2xx response is accepted. |
 | `expected_response_codes:` | Array of expected HTTP status codes |
 | `stream:` | Enable streaming (`:file`, `:io`, `:block`, or `true`) |
 | `return:` | Return type (`:response`, `:body`, or parsed JSON by default) |
 
+POST, PUT and PATCH routes without a `body:` option take the request body as a `body:` argument:
+
+```ruby
+route :create_user, '/users'
+
+client.create_user(body: { name: 'Ann' })
+```
+
+### Per-Request Options
+
+Every generated method also accepts options that apply to that call only:
+
+```ruby
+client.get_user(
+  id: 1,
+  headers: { 'X-Trace-Id' => 'abc' },   # merged over the class headers
+  query: { expand: 'teams' },           # merged over the route's query params
+  body: { name: 'Ann' },                # replaces the route's body
+  connection_options: { read_timeout: 5 },
+  retries: 3,                           # attempts for this call
+  sleep: 0.5,                           # seconds between attempts
+  return: :body                         # :body or :response instead of parsed JSON
+)
+```
+
 ### Automatic HTTP Method Detection
 
-The Router automatically detects HTTP methods based on route names:
+The Router detects the HTTP method from how the route name starts:
 
-| Prefix | HTTP Method |
-|--------|-------------|
-| `get_`, `find_`, `fetch_`, `list_`, `search_` | GET |
-| `post_`, `create_`, `add_`, `insert_` | POST |
-| `put_`, `update_`, `modify_`, `change_` | PUT |
-| `patch_` | PATCH |
-| `delete_`, `remove_`, `destroy_` | DELETE |
+| Name starts with | HTTP Method |
+|------------------|-------------|
+| `post`, `create`, `add`, `insert` | POST |
+| `put`, `update`, `modify`, `change` | PUT |
+| `patch` | PATCH |
+| `delete`, `remove` | DELETE |
+| anything else | GET |
+
+The match is on the start of the name only, so `address_lookup` is a POST and `destroy_user` is a GET. Pass `method:` when the name doesn't say it.
 
 ```ruby
 class MyApiClient
@@ -133,11 +162,30 @@ end
 
 Parameters can be defined in three ways:
 
-**1. Path Parameters** (using `:param` or `{param}` syntax):
+**1. Path Parameters** (using `:param` syntax):
 
 ```ruby
 route :get_user, '/users/:id'
-route :get_post, '/users/{user_id}/posts/{post_id}'
+# client.get_user(id: 1)
+```
+
+`{name}` is filled from the client's own `name` method rather than an argument, which suits values like account IDs that are set once:
+
+```ruby
+attr_accessor :account_id
+
+route :get_invoices, '/accounts/{account_id}/invoices'
+# client.get_invoices
+```
+
+The same `'{name}'` form works as a value inside `query:` and `body:`.
+
+Path values are inserted as given. To URL-encode them, override `escape_path`:
+
+```ruby
+def escape_path(value)
+  ERB::Util.url_encode(value.to_s)
+end
 ```
 
 **2. Query Parameters:**
@@ -194,7 +242,7 @@ class MyApiClient
   # Default: JSON (using to_json)
   body_builder :to_json
 
-  # URL-encoded form data (using to_query)
+  # URL-encoded form data (using to_query, requires ActiveSupport)
   body_builder :to_query
 
   # Custom query params builder (no ActiveSupport dependency)
@@ -214,6 +262,8 @@ class MyApiClient
 end
 ```
 
+String bodies are sent as is. Query strings are built the same way with `query_builder`, which accepts `:to_query`, `:query_params`, a method name or a block. It defaults to `:to_query` when ActiveSupport is loaded and to `:query_params` otherwise.
+
 ### Nested Routing (Sections)
 
 Organize complex APIs with nested routes:
@@ -223,12 +273,17 @@ class MyApiClient
   include ClientApiBuilder::Router
 
   base_url 'https://api.example.com'
-  header 'Authorization', :auth_token
+  header 'Authorization', :authorization
 
   attr_accessor :auth_token
 
+  def authorization
+    "Bearer #{auth_token}"
+  end
+
   section :users do
     base_url 'https://api.example.com/v2'  # Override base URL
+    header 'Authorization', :authorization
 
     route :list, '/users'
     route :get, '/users/:id'
@@ -236,6 +291,8 @@ class MyApiClient
   end
 
   section :posts do
+    header 'Authorization', :authorization
+
     route :list, '/posts'
     route :get, '/posts/:id'
   end
@@ -249,6 +306,8 @@ users = client.users.list
 user = client.users.get(id: 123)
 posts = client.posts.list
 ```
+
+A section is its own router class. It uses the parent's `base_url` unless it sets one, but headers, query params, connection options, retries and builders are not inherited, so declare the ones it needs inside the section. Symbol and block values, `{name}` path values, and response blocks are evaluated on the root client, so they can use its methods and state.
 
 ### Connection Options
 
@@ -269,6 +328,8 @@ class MyApiClient
 end
 ```
 
+Any `Net::HTTP.start` option can be set this way. Your options are applied over the secure HTTPS defaults, so setting `verify_mode` yourself replaces `VERIFY_PEER`.
+
 ### Retry Configuration
 
 Configure automatic retries for transient failures:
@@ -279,12 +340,14 @@ class MyApiClient
 
   base_url 'https://api.example.com'
 
-  # Retry up to 3 times with 0.5 second delay between attempts
+  # Make up to 3 attempts in total, waiting 0.5 seconds between them
   configure_retries 3, 0.5
 end
 ```
 
-By default, retries are performed only for network-related errors:
+The first argument is the total number of attempts, not extra retries. The default is 1, so requests are not retried unless you configure it. `retries:` and `sleep:` can also be passed per request.
+
+Only these network errors are retried by default:
 - `Net::OpenTimeout`, `Net::ReadTimeout`
 - `Errno::ECONNRESET`, `Errno::ECONNREFUSED`, `Errno::ETIMEDOUT`
 - `SocketError`, `EOFError`
@@ -346,6 +409,8 @@ client.process_stream do |response, chunk|
 end
 ```
 
+Streaming routes return the `Net::HTTPResponse`. Files are written in `wb` mode by default; pass `connection_options: { file_mode: 'ab' }` to append.
+
 ### Response Handling
 
 Customize how responses are processed:
@@ -371,11 +436,16 @@ class MyApiClient
     data
   end
 end
+
+# A block passed to the call replaces the route's block
+client.get_user(id: 1) { |data| data['name'] }
 ```
+
+Blocks run on the client, so they can call its methods and set its state. Empty response bodies return `nil`.
 
 ### Error Handling
 
-The gem provides detailed error information:
+`ClientApiBuilder::UnexpectedResponse` is raised when the status code isn't expected (any non-2xx by default, or anything outside `expected_response_code(s)`) and when a response body isn't valid JSON. It carries the response:
 
 ```ruby
 begin
@@ -413,12 +483,9 @@ puts client.request_attempts     # Number of attempts (including retries)
 
 ### ActiveSupport Integration
 
-When ActiveSupport is available, the gem provides instrumentation and logging:
+When ActiveSupport is loaded before your client class includes `ClientApiBuilder::Router`, every request is instrumented as a `client_api_builder.request` event:
 
 ```ruby
-# Set up logging
-ClientApiBuilder.logger = Logger.new(STDOUT)
-
 # Subscribe to request events
 ActiveSupport::Notifications.subscribe('client_api_builder.request') do |*args|
   event = ActiveSupport::Notifications::Event.new(*args)
@@ -434,9 +501,15 @@ subscriber = ClientApiBuilder::ActiveSupportLogSubscriber.new(Rails.logger)
 subscriber.subscribe!
 ```
 
+Separately, `ClientApiBuilder.logger` receives every exception raised during a request attempt, including ones that are retried:
+
+```ruby
+ClientApiBuilder.logger = Logger.new($stdout)
+```
+
 #### Production Logging
 
-For production environments, it's important to log requests without exposing sensitive credentials that may be present in query parameters. The following example strips query parameters from logged URLs:
+The built-in log subscriber already leaves out query strings, which may hold credentials. To customize the format, subscribe directly:
 
 ```ruby
 ActiveSupport::Notifications.subscribe('client_api_builder.request') do |_, start_time, end_time, _, payload|
@@ -462,7 +535,7 @@ Client API Builder includes several security features enabled by default:
 
 ### SSL/TLS Verification
 
-All HTTPS connections verify SSL certificates by default using `OpenSSL::SSL::VERIFY_PEER`. Default timeouts are also configured to prevent hanging connections.
+HTTPS connections verify SSL certificates using `OpenSSL::SSL::VERIFY_PEER` and default to a 30 second open timeout and 60 second read timeout. Plain HTTP connections use Net::HTTP's own defaults.
 
 ### SSRF Protection
 
@@ -481,7 +554,7 @@ end
 
 ### Path Traversal Protection
 
-File streaming operations validate paths to prevent directory traversal attacks:
+File streaming rejects any path containing `..` or a null byte:
 
 ```ruby
 # These will raise ArgumentError
@@ -523,12 +596,12 @@ end
 | Method | Description |
 |--------|-------------|
 | `base_url(url)` | Set the base URL for all requests |
-| `header(name, value)` | Add a header to all requests |
+| `header(name, value = nil, &block)` | Add a header to all requests (value, method name symbol, or block) |
 | `body_builder(builder)` | Configure request body serialization |
 | `query_builder(builder)` | Configure query string serialization |
-| `query_param(name, value)` | Add a query parameter to all requests |
+| `query_param(name, value = nil, &block)` | Add a query parameter to all requests (value, method name symbol, or block) |
 | `connection_option(name, value)` | Set Net::HTTP connection options |
-| `configure_retries(max, sleep)` | Configure retry behavior |
+| `configure_retries(max_attempts, sleep = 0.05)` | Configure retry behavior |
 | `route(name, path, options)` | Define an API endpoint |
 | `section(name, options, &block)` | Define nested routes |
 | `namespace(path, &block)` | Add path prefix to routes in block |
@@ -542,11 +615,27 @@ end
 | `total_request_time` | Duration of last request in seconds |
 | `request_attempts` | Number of attempts for last request |
 | `root_router` | Returns the root router (for nested routers) |
+| `base_url` | Base URL used for requests |
+
+### Overridable Hooks
+
+Define these in your client to change default behavior:
+
+| Method | Default |
+|--------|---------|
+| `retry_request?(exception, options)` | `true` for the network errors listed under Retry Configuration |
+| `escape_path(value)` | Returns the value unchanged |
+| `parse_response(response, options)` | Parses the body as JSON, `nil` when empty |
+| `handle_response(response, options, &block)` | Applies `return:`, parsing and the response block |
+| `expected_response_code!(response, codes, options)` | Raises `UnexpectedResponse` for unexpected codes |
+| `get_retry_request_max_retries(options)` | `retries:` option, then `configure_retries`, then 1 |
+| `get_retry_request_sleep_time(exception, options)` | `sleep:` option, then `configure_retries`, then 0.05 |
 
 ## Requirements
 
 - Ruby 3.2+
 - `inheritance-helper` gem (>= 0.2.5)
+- `activesupport` (optional) for `to_query` builders and instrumentation
 
 ## Contributing
 
@@ -555,7 +644,7 @@ Bug reports and pull requests are welcome on GitHub at https://github.com/dougyo
 1. Fork the repository
 2. Create your feature branch (`git checkout -b feature/my-feature`)
 3. Write tests for your changes
-4. Ensure all tests pass (`bundle exec rspec`)
+4. Ensure all tests pass with full line and branch coverage (`CI=true bundle exec rspec`)
 5. Ensure code style compliance (`bundle exec rubocop`)
 6. Commit your changes using [conventional commits](https://www.conventionalcommits.org/) (`git commit -am 'feat(router): add my feature'`); release notes and version bumps are generated from them
 7. Push to the branch (`git push origin feature/my-feature`)

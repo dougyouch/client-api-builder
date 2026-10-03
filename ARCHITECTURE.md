@@ -47,6 +47,10 @@ The `Router` module is the core component that provides the main functionality f
 - `build_uri`: Constructs full URI with base_url, path, and query
 - `handle_response`: Processes API responses, parses JSON by default
 - `request_wrapper`: Manages request execution with retry and instrumentation
+- `expected_response_code!`: Raises `UnexpectedResponse` unless the code is expected (any 2xx when none are configured)
+- `parse_response`: Parses JSON bodies, returning `nil` for empty ones
+- `retry_request?`: Decides whether an exception is retried (network errors only by default)
+- `escape_path`: Hook for encoding path values; returns them unchanged by default
 - `root_router`: Returns self (overridden in NestedRouter)
 
 **Instance Attributes** (via `attr_reader`):
@@ -64,11 +68,14 @@ route :get_user, '/users/:id', expected_response_code: 200
 ```
 
 Generates:
-- `get_user_raw_response(id:, **options, &block)` - Makes HTTP request, sets `@response` and `@request_options`
-- `get_user(id:, **options, &block)` - Wraps raw_response with retry logic, response code validation, and response handling
+- `get_user_raw_response(id:, **__options__, &block)` - Makes HTTP request, sets `@response` and `@request_options`
+- `get_user(id:, **__options__, &block)` - Wraps raw_response with retry logic, response code validation, and response handling
 
-**Path Parameters**: Extracted from `:param` or `{param}` syntax in path
-**Body/Query Parameters**: Extracted from `body:` and `query:` options using symbol values
+**Keyword arguments** come from `:param` segments in the path and symbol values in `body:` and `query:`. Routes that need a body but don't define one get a `body:` argument, and streaming routes get `file:` or `io:`.
+**Instance values**: `{name}` in the path, or a `'{name}'` string value in `body:`/`query:`, compiles to a call to the client's `name` method instead of an argument.
+**Values in the generated code** are rendered by `value_to_code`, which keeps symbol keys as `key: value` so the output is the same on every Ruby version.
+
+`generate_route_code` rejects method names that aren't plain identifiers, since the name is interpolated into the generated source.
 
 ### 3. HTTP Method Auto-Detection
 
@@ -81,6 +88,8 @@ When `method:` is not specified in route options, `auto_detect_http_method` infe
 | `patch` | PATCH |
 | `delete`, `remove` | DELETE |
 | (default) | GET |
+
+The patterns match the start of the name with no word boundary, so `address_lookup` is a POST.
 
 ### 4. Nested Router (`ClientApiBuilder::NestedRouter`)
 
@@ -99,8 +108,11 @@ Key behaviors:
 - Stores `root_router` reference to access shared state
 - Stores `nested_router_options` passed from section definition
 - Overrides `base_url` to fall back to root_router's base_url
-- Delegates `handle_response` to root_router
-- Overrides `get_instance_method` to access root_router's instance variables in paths
+- Delegates `handle_response` to root_router, so response blocks run on the root client
+- Overrides `get_instance_method` so `{name}` path values call `root_router.name`
+- Header and query param symbols and procs are evaluated on root_router (as on any router)
+- Has its own `default_options`: headers, query params, connection options, retries and builders are not inherited from the root router
+- `nested_router_options` are stored but not read by the library
 
 ### 5. Section Module (`ClientApiBuilder::Section`)
 
@@ -129,7 +141,7 @@ Provides HTTP request execution using Net::HTTP:
 
 ### 7. QueryParams Class
 
-Standalone query parameter builder (used when ActiveSupport unavailable):
+Standalone query parameter builder (the default `query_builder` when `Hash#to_query` is unavailable, and the `:query_params` builder option):
 
 - Handles nested hashes with bracket notation: `user[name]=John`
 - Handles arrays: `ids[]=1&ids[]=2`
@@ -138,13 +150,18 @@ Standalone query parameter builder (used when ActiveSupport unavailable):
 
 ### 8. ActiveSupport Integration
 
-**ActiveSupportNotifications** (conditionally included when ActiveSupport defined):
+**ActiveSupportNotifications** (included when `ActiveSupport` is defined at the time a class includes `Router`):
 - Overrides `instrument_request` to use `ActiveSupport::Notifications.instrument`
 - Event name: `client_api_builder.request`
 - Payload includes `client: self`
 
 **ActiveSupportLogSubscriber**:
 - Subscribes to `client_api_builder.request` events for logging
+- Logs `METHOD scheme://host/path[code] took Nms`, leaving out the query string
+
+Without ActiveSupport, `Router#instrument_request` only records `total_request_time`.
+
+**`ClientApiBuilder.logger`**: when set, `retry_request` logs every exception raised by a request attempt.
 
 ## Design Patterns
 
@@ -187,18 +204,20 @@ end
 
 ## Configuration Hierarchy
 
-1. **Default Options**: `Router.default_options` returns frozen hash with defaults
-2. **Class-level Configuration**: Set through DSL methods, stored via `add_value_to_class_method`
-3. **Instance-level**: Access class config, can override in method calls
-4. **Request-level**: `**__options__` parameter on generated methods
+1. **Default Options**: `ClassMethods#default_options` returns a frozen hash of defaults
+2. **Class-level Configuration**: DSL methods redefine `default_options` via `add_value_to_class_method`; subclasses inherit it
+3. **Instance overrides**: Clients can override instance methods such as `base_url` or the hooks above
+4. **Request-level**: `**__options__` on generated methods (`headers:`, `query:`, `body:`, `connection_options:`, `retries:`, `sleep:`, `return:`)
 
 ## Error Handling
 
 - `ClientApiBuilder::Error`: Base error class
 - `ClientApiBuilder::UnexpectedResponse`: Raised when response code doesn't match expected codes
   - Stores `response` for inspection
-- Response procs: Per-route custom response handling stored in `default_options[:response_procs]`
-- Retry on exception: `retry_request?` method (always returns true by default, override to customize)
+  - Also raised for response bodies that aren't valid JSON
+- Response procs: Per-route custom response handling stored in `default_options[:response_procs]`; a block passed to the call takes precedence
+- Retry on exception: `retry_request?` returns true only for network errors (`Net::OpenTimeout`, `Net::ReadTimeout`, `Errno::ECONNRESET`, `Errno::ECONNREFUSED`, `Errno::ETIMEDOUT`, `SocketError`, `EOFError`); override to customize
+- Retries count total attempts: `configure_retries 3` makes at most 3 attempts, and the default of 1 means no retries
 
 ## Streaming Support
 
@@ -211,6 +230,8 @@ route :process, '/data', stream: :block    # stream with block for each chunk
 route :download, '/file', stream: true     # alias for :file
 ```
 
+`stream_to_file` takes the file mode from the `:file_mode` connection option (default `wb`, limited to `ALLOWED_FILE_MODES`) and rejects paths containing `..` or a null byte. Streaming routes return the `Net::HTTPResponse`.
+
 ## Dependencies
 
 - `inheritance-helper`: Class inheritance and configuration management
@@ -221,4 +242,4 @@ route :download, '/file', stream: true     # alias for :file
 
 ## Thread Safety
 
-The library is not thread-safe. Each client instance maintains state (`@response`, `@request_options`, etc.) that would cause race conditions if shared across threads. Create separate client instances per thread.
+The namespace stack used while defining routes is thread-local. Clients themselves are not thread-safe. Each client instance maintains state (`@response`, `@request_options`, etc.) that would cause race conditions if shared across threads. Create separate client instances per thread.

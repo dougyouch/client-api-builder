@@ -8,12 +8,17 @@ Client API Builder is a Ruby gem for creating API clients through declarative co
 
 ## Common Commands
 
+Development uses the Ruby in `.ruby-version` (4.0.x), which `Gemfile.lock` is resolved against. The gem itself supports Ruby 3.2+ (`required_ruby_version` and RuboCop's `TargetRubyVersion`).
+
 ```bash
 # Install dependencies
 bundle install
 
 # Run all tests
 bundle exec rspec
+
+# Run all tests with the CI coverage gate (fails below 100% line or branch coverage)
+CI=true bundle exec rspec
 
 # Run a single test file
 bundle exec rspec spec/client_api_builder/router_spec.rb
@@ -26,15 +31,26 @@ bundle exec rubocop
 
 # Build the gem
 gem build client-api-builder.gemspec
+
+# IRB with the gem and the example clients loaded
+script/console
 ```
+
+## Testing
+
+- Line and branch coverage must stay at **100%**. `spec/spec_helper.rb` sets `minimum_coverage line: 100, branch: 100` when `CI` is set, so CI fails on any uncovered line or branch. Local runs skip the gate so single spec files can run; use `CI=true bundle exec rspec` before pushing.
+- Every new line or branch in `lib/` needs a spec. Coverage is measured over `lib/**/*.rb`, except `lib/client_api_builder/version.rb`, which loads before SimpleCov starts.
+- HTTP is stubbed with WebMock; real connections are disabled.
+- Spec layout: `router_spec.rb` (DSL and generated code against known output), `router_code_generation_spec.rb` (code generation branches), `router_requests_spec.rb` (end-to-end request behavior), `router_security_spec.rb`, plus one spec per remaining class.
+- RuboCop runs with `rubocop-rspec`; keep `bundle exec rubocop` clean.
 
 ## Architecture
 
 ### Core Components
 
-- **Router** (`lib/client_api_builder/router.rb`): Main module providing `route`, `base_url`, `header`, `body_builder`, `query_builder`, and `configure_retries` class methods. Uses `InheritanceHelper::Methods` for configuration inheritance.
+- **Router** (`lib/client_api_builder/router.rb`): Main module. Its `ClassMethods` provide the DSL (`base_url`, `header`, `query_param`, `connection_option`, `body_builder`, `query_builder`, `configure_retries`, `namespace`, `route`) and the code generator; the request/response instance methods are defined on `Router` itself. Uses `InheritanceHelper::Methods` for configuration inheritance.
 
-- **NestedRouter** (`lib/client_api_builder/nested_router.rb`): Enables hierarchical API organization. Maintains reference to `root_router` and shares configuration with parent.
+- **NestedRouter** (`lib/client_api_builder/nested_router.rb`): Base class for sections. Holds a `root_router` reference: it falls back to the root's `base_url`, delegates `handle_response` to it, and resolves `{name}` path values on it. It does **not** inherit the root's headers, query params, connection options or retry settings.
 
 - **Section** (`lib/client_api_builder/section.rb`): Provides `section` class method for creating nested route groups via dynamically generated classes.
 
@@ -42,7 +58,9 @@ gem build client-api-builder.gemspec
 
 - **QueryParams** (`lib/client_api_builder/query_params.rb`): Custom query parameter builder used when ActiveSupport's `to_query` is unavailable.
 
-- **ActiveSupportNotifications/LogSubscriber**: Optional integration for logging and instrumentation when ActiveSupport is present.
+- **ActiveSupportNotifications/LogSubscriber**: Optional instrumentation (`client_api_builder.request` events) and logging. Notifications are included only if `ActiveSupport` is defined when a class includes `Router`.
+
+- **Version** (`lib/client_api_builder/version.rb`): `ClientApiBuilder::VERSION`, read by the gemspec and bumped by release-please.
 
 ### Route Code Generation
 
@@ -50,20 +68,29 @@ The `route` class method in Router uses `generate_route_code` to dynamically cre
 1. `method_name_raw_response` - Makes the HTTP request
 2. `method_name` - Wraps the request with retry logic and response handling
 
+Keyword arguments come from `:param` path segments and symbol values in `query:`/`body:`. `{name}` (or a `'{name}'` value) calls the client's `name` method instead. `router_spec.rb` asserts exact generated source, so changes to the generator usually need those expectations updated.
+
 ### HTTP Method Auto-Detection
 
-Methods are auto-detected from route names: `post/create/add/insert` → POST, `put/update/modify/change` → PUT, `patch` → PATCH, `delete/remove` → DELETE, others → GET.
+Methods are auto-detected from the start of route names: `post/create/add/insert` → POST, `put/update/modify/change` → PUT, `patch` → PATCH, `delete/remove` → DELETE, others → GET. There's no word boundary (`address_lookup` → POST), and `destroy_*` is GET.
+
+### Behaviors Worth Knowing
+
+- Without `expected_response_code(s)`, any 2xx is accepted; with them, only the listed codes.
+- `configure_retries(n)` sets total attempts (default 1, so no retries). Only network errors are retried (`retry_request?`).
+- `escape_path` returns path values unchanged, so values are not URL-encoded unless a client overrides it.
+- HTTPS gets `VERIFY_PEER` and 30s/60s timeouts by default; user connection options override them.
 
 ### Configuration Hierarchy
 
 1. `default_options` class method (base defaults)
-2. Class-level configuration via DSL methods
-3. Instance-level overrides
-4. Request-level options (`**__options__`)
+2. Class-level configuration via DSL methods (inherited by subclasses)
+3. Instance method overrides (e.g. `base_url`, `escape_path`, `retry_request?`)
+4. Request-level options (`**__options__`: `headers:`, `query:`, `body:`, `connection_options:`, `retries:`, `sleep:`, `return:`)
 
 ## Key Patterns
 
-- Module inclusion with `self.included(base)` extending ClassMethods and including InstanceMethods
+- Module inclusion with `self.included(base)`: extends `ClassMethods`, includes `Section`, `NetHTTP::Request` and (with ActiveSupport) `ActiveSupportNotifications`
 - `add_value_to_class_method` from `inheritance-helper` for configuration inheritance
 - Response procs stored per method name for custom response handling
 - `root_router` method for accessing the top-level router from nested routers
@@ -71,8 +98,12 @@ Methods are auto-detected from route names: `post/create/add/insert` → POST, `
 ## Dependencies
 
 - `inheritance-helper` (runtime): Class inheritance and method management
-- `webmock` (test): HTTP request stubbing
-- `activesupport` (optional): Enhanced query param building and instrumentation
+- `activesupport` (optional at runtime, installed for development): `to_query` builders and instrumentation
+- Development: `rspec`, `webmock`, `simplecov`, `rubocop`, `rubocop-rspec`, `rake`
+
+## CI
+
+`.github/workflows/ci.yml` runs RuboCop and the specs on the `.ruby-version` Ruby. On pushes to `master`, it publishes `coverage.svg` and `branches.svg` (from `script/coverage_badge.rb`) to the orphan `badges` branch for the README badges.
 
 ## Releases
 
@@ -93,4 +124,5 @@ Format using angular formatting:
 When modifying the codebase, keep documentation in sync:
 - **ARCHITECTURE.md** - Update when adding/removing classes, changing component relationships, or altering data flow patterns
 - **README.md** - Update when adding new features, changing public APIs, or modifying usage examples
+- **CHANGELOG.md** - Generated by release-please from commit messages; don't edit by hand except to fix release notes
 - **Code comments** - Update inline documentation when changing method signatures or behavior
