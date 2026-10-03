@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.7.1](https://github.com/dougyouch/client-api-builder/compare/v0.7.0...v0.7.1) (2026-10-03)
+
+
+### Bug Fixes
+
+* **router:** detect destroy_ routes as DELETE ([85604c4](https://github.com/dougyouch/client-api-builder/commit/85604c4d974c8483e292e700eb51a2c78e312b54))
+* **router:** url-encode path values ([76d6fb4](https://github.com/dougyouch/client-api-builder/commit/76d6fb4fa246b342e263322d06262cba6760c278))
+
+### Upgrade Notes
+
+* Path values are now percent-encoded by `escape_path`, including `/`. A value like `'a/b'` that previously expanded into two path segments is now sent as one segment (`a%2Fb`). To keep `/` as a separator, override `escape_path` in your client, e.g. `value.to_s.split('/').map { |part| ERB::Util.url_encode(part) }.join('/')`.
+
 ## [0.7.0](https://github.com/dougyouch/client-api-builder/compare/v0.6.1...v0.7.0) (2026-10-03)
 
 
