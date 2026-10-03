@@ -1,8 +1,10 @@
 # frozen_string_literal: true
 
+require_relative 'lib/client_api_builder/version'
+
 Gem::Specification.new do |s|
   s.name        = 'client-api-builder'
-  s.version     = '0.6.1'
+  s.version     = ClientApiBuilder::VERSION
   s.licenses    = ['MIT']
   s.summary     = 'Build robust, secure API clients through declarative configuration'
   s.description = <<~DESC
@@ -17,7 +19,7 @@ Gem::Specification.new do |s|
   s.homepage    = 'https://github.com/dougyouch/client-api-builder'
   s.files       = `git ls-files -z`.split("\x0").reject { |f| f.match(%r{^(test|spec|features)/}) }
 
-  s.required_ruby_version = '>= 3.0'
+  s.required_ruby_version = '>= 3.2'
 
   s.add_dependency 'inheritance-helper', '>= 0.2.5'
 

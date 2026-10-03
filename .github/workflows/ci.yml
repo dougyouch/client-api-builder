@@ -3,24 +3,38 @@ name: CI
 on:
   push:
     branches: [master]
+  # release-please PRs change only these files. Their runs are triggered by
+  # github-actions[bot], which GitHub holds for approval until they expire as
+  # failures; release.yml runs this workflow before publishing anyway. A PR is
+  # skipped only if every file it changes is listed here.
   pull_request:
-    branches: [master]
+    paths-ignore:
+      - CHANGELOG.md
+      - .release-please-manifest.json
+      - Gemfile.lock
+      - lib/client_api_builder/version.rb
+  workflow_call:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   lint:
     name: RuboCop
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Ruby
-        uses: ruby/setup-ruby@v1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ruby-version: '3.4'
+          persist-credentials: false
+      - uses: ruby/setup-ruby@14594264cd68ce8a2345dd349bc3d138a4ef85c8 # v1.327.0
+        with:
+          ruby-version: '4.0'
           bundler-cache: true
-
-      - name: Run RuboCop
-        run: bundle exec rubocop --format github
+      - run: bundle exec rubocop --format github
 
   test:
     name: Tests (Ruby ${{ matrix.ruby }})
@@ -28,26 +42,55 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        ruby: ['3.2', '3.3', '3.4']
-
+        ruby: ['3.2', '3.3', '3.4', '4.0']
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Ruby ${{ matrix.ruby }}
-        uses: ruby/setup-ruby@v1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ruby/setup-ruby@14594264cd68ce8a2345dd349bc3d138a4ef85c8 # v1.327.0
         with:
           ruby-version: ${{ matrix.ruby }}
           bundler-cache: true
-
-      - name: Run tests
-        run: bundle exec rspec
-
-      - name: Upload coverage to Codecov
-        if: matrix.ruby == '3.4'
-        uses: codecov/codecov-action@v4
+      - run: bundle exec rspec
+      # one job's report feeds the coverage badge
+      - name: Upload coverage report
+        if: matrix.ruby == '4.0'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          files: coverage/coverage.xml
-          fail_ci_if_error: false
-          verbose: true
-        env:
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+          name: coverage
+          path: coverage/
+          # .last_run.json (read by the badge job) is a dotfile; upload-artifact skips those by default
+          include-hidden-files: true
+          retention-days: 14
+
+  # Publishes coverage.svg to the orphan `badges` branch; the README badge points at it.
+  # Skipped when called from release.yml (github.workflow is the caller's name there).
+  coverage-badge:
+    if: github.workflow == 'CI' && github.event_name == 'push' && github.ref == 'refs/heads/master'
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ruby/setup-ruby@14594264cd68ce8a2345dd349bc3d138a4ef85c8 # v1.327.0
+        with:
+          ruby-version: '4.0'
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: coverage
+          path: coverage/
+      - run: ruby script/coverage_badge.rb coverage/.last_run.json "$RUNNER_TEMP/coverage.svg"
+      - name: Push badge to badges branch
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          if git fetch --depth=1 origin badges; then
+            git switch badges
+          else
+            git switch --orphan badges
+          fi
+          cp "$RUNNER_TEMP/coverage.svg" coverage.svg
+          git add coverage.svg
+          git diff --cached --quiet || git commit -m "coverage badge for ${GITHUB_SHA::7}"
+          git push origin badges

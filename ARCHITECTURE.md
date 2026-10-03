@@ -18,7 +18,8 @@ lib/
     ├── net_http_request.rb            # Net::HTTP request execution and streaming
     ├── query_params.rb                # Custom query parameter builder
     ├── active_support_notifications.rb # ActiveSupport instrumentation
-    └── active_support_log_subscriber.rb # ActiveSupport logging
+    ├── active_support_log_subscriber.rb # ActiveSupport logging
+    └── version.rb                     # Gem version, bumped by release-please
 ```
 
 ## Core Components

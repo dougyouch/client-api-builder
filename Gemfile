@@ -1,15 +1,15 @@
 # frozen_string_literal: true
 
-source 'http://rubygems.org'
+source 'https://rubygems.org'
 
-gem 'inheritance-helper'
+gemspec
 
 group :development do
   gem 'activesupport'
   gem 'rake'
   gem 'rspec'
   gem 'rubocop'
+  gem 'rubocop-rspec'
   gem 'simplecov'
-  gem 'simplecov-cobertura'
   gem 'webmock'
 end

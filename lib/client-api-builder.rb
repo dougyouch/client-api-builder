@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require_relative 'client_api_builder/version'
+
 module ClientApiBuilder
   class Error < StandardError; end
 

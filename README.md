@@ -1,8 +1,8 @@
 # Client API Builder
 
 [![Gem Version](https://badge.fury.io/rb/client-api-builder.svg)](https://badge.fury.io/rb/client-api-builder)
-[![CI](https://github.com/dougyouch/client-api-builder/actions/workflows/ci.yml/badge.svg)](https://github.com/dougyouch/client-api-builder/actions/workflows/ci.yml)
-[![codecov](https://codecov.io/gh/dougyouch/client-api-builder/branch/master/graph/badge.svg)](https://codecov.io/gh/dougyouch/client-api-builder)
+[![CI](https://github.com/dougyouch/client-api-builder/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/dougyouch/client-api-builder/actions/workflows/ci.yml)
+[![Coverage](https://raw.githubusercontent.com/dougyouch/client-api-builder/badges/coverage.svg)](https://github.com/dougyouch/client-api-builder/actions/workflows/ci.yml)
 
 A Ruby gem for building robust, secure API clients through declarative configuration. Define your API endpoints and their behavior with minimal boilerplate while benefiting from built-in security features, automatic retries, and comprehensive error handling.
 
@@ -544,7 +544,7 @@ end
 
 ## Requirements
 
-- Ruby 3.0+
+- Ruby 3.2+
 - `inheritance-helper` gem (>= 0.2.5)
 
 ## Contributing
@@ -556,7 +556,7 @@ Bug reports and pull requests are welcome on GitHub at https://github.com/dougyo
 3. Write tests for your changes
 4. Ensure all tests pass (`bundle exec rspec`)
 5. Ensure code style compliance (`bundle exec rubocop`)
-6. Commit your changes (`git commit -am 'Add my feature'`)
+6. Commit your changes using [conventional commits](https://www.conventionalcommits.org/) (`git commit -am 'feat(router): add my feature'`); release notes and version bumps are generated from them
 7. Push to the branch (`git push origin feature/my-feature`)
 8. Create a Pull Request
 

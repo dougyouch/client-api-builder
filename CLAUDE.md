@@ -74,6 +74,10 @@ Methods are auto-detected from route names: `post/create/add/insert` → POST, `
 - `webmock` (test): HTTP request stubbing
 - `activesupport` (optional): Enhanced query param building and instrumentation
 
+## Releases
+
+Releases are automated by release-please (`.github/workflows/release.yml`). Conventional commits on `master` (`fix:` → patch, `feat:` → minor, `!`/`BREAKING CHANGE` → major) update an open release PR that bumps `lib/client_api_builder/version.rb`, `Gemfile.lock`, and `CHANGELOG.md`. Merging that PR tags `vX.Y.Z`, creates the GitHub release, and publishes the gem to RubyGems. Don't bump the version by hand.
+
 ## Code Commits
 
 Format using angular formatting:
