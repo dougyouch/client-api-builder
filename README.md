@@ -119,7 +119,7 @@ Every generated method also accepts options that apply to that call only:
 ```ruby
 client.get_user(
   id: 1,
-  headers: { 'X-Trace-Id' => 'abc' },   # merged over the class headers
+  headers: { 'X-Trace-Id' => 'abc' },   # merged over the class headers; nil removes one
   query: { expand: 'teams' },           # merged over the route's query params
   body: { name: 'Ann' },                # replaces the route's body
   connection_options: { read_timeout: 5 },
@@ -232,6 +232,8 @@ class MyApiClient
 end
 ```
 
+A symbol or block given to `header` or `query_param` is evaluated on the client for every request. Values passed when calling a route, including per-request `headers:` and `query:`, are always sent as given, so `client.list_items(sort: :asc)` sends `sort=asc`. Header values are sent as strings; setting one to `nil` for a request leaves it out.
+
 ### Request Body Formats
 
 Configure how request bodies are serialized:
@@ -308,7 +310,7 @@ user = client.users.get(id: 123)
 posts = client.posts.list
 ```
 
-A section is its own router class. It uses the parent's `base_url` unless it sets one, but headers, query params, connection options, retries and builders are not inherited, so declare the ones it needs inside the section. Symbol and block values, `{name}` path values, and response blocks are evaluated on the root client, so they can use its methods and state.
+A section is its own router class. It uses the parent's `base_url` unless it sets one, but headers, query params, connection options, retries and builders are not inherited, so declare the ones it needs inside the section. Symbol and block values given to `header` and `query_param`, `{name}` path values, and response blocks are evaluated on the root client, so they can use its methods and state.
 
 ### Connection Options
 

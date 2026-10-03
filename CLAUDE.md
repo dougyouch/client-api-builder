@@ -78,6 +78,7 @@ Methods are auto-detected from the start of route names: `post/create/add/insert
 
 - Without `expected_response_code(s)`, any 2xx is accepted; with them, only the listed codes.
 - `configure_retries(n)` sets total attempts (default 1, so no retries). Only network errors are retried (`retry_request?`).
+- Symbols/procs are resolved (on `root_router`) only for class-level `header`/`query_param` values. Route arguments and per-request `headers:`/`query:` are data and are sent as given.
 - `escape_path` percent-encodes every path value (arguments and `{name}`), including `/`, so each stays one segment.
 - HTTPS gets `VERIFY_PEER` and 30s/60s timeouts by default; user connection options override them.
 

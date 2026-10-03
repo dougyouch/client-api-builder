@@ -112,6 +112,44 @@ describe ClientApiBuilder::Router do
     end
   end
 
+  describe 'symbol values' do
+    let(:router_class) do
+      Class.new do
+        include ClientApiBuilder::Router
+
+        base_url 'http://example.com'
+        header 'X-Key', :api_key
+        query_param :key, :api_key
+
+        route :list_items, '/items', query: { sort: :sort }
+
+        def api_key
+          'k1'
+        end
+      end
+    end
+
+    before { stub_request(:get, %r{http://example.com/items}) }
+
+    it 'sends route arguments as values, not method names' do
+      router.list_items(sort: :api_key)
+      expect(URI.decode_www_form(router.request_options[:uri].query).to_h).to eq('key' => 'k1', 'sort' => 'api_key')
+    end
+
+    it 'sends per-request query and header values as given' do
+      router.list_items(sort: :asc, query: { order: :desc }, headers: { 'X-Mode' => :fast })
+      expect(URI.decode_www_form(router.request_options[:uri].query).to_h).to eq('key' => 'k1', 'sort' => 'asc', 'order' => 'desc')
+      expect(router.request_options[:headers]).to eq('X-Key' => 'k1', 'X-Mode' => 'fast')
+    end
+
+    it 'drops a class-level header when the request sets it to nil' do
+      stub = stub_request(:get, 'http://example.com/items?key=k1&sort=asc').with { |request| !request.headers.key?('X-Key') }
+
+      router.list_items(sort: 'asc', headers: { 'X-Key' => nil })
+      expect(stub).to have_been_requested
+    end
+  end
+
   describe 'request options' do
     it 'adds query params from the request options' do
       stub = stub_request(:get, 'http://example.com/items?page=2')

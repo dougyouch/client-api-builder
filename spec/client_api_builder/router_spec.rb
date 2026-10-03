@@ -112,17 +112,21 @@ describe ClientApiBuilder::Router do
   end
 
   describe '#build_query' do
-    subject { router.build_query(query, {}) }
+    subject { router.build_query(query, { query: { order: :desc } }) }
 
-    let(:query) { { name: :name, test: proc { 'xyz' }, foo: 'Bar' } }
-    let(:expected_query) { 'name=Mike&test=xyz&foo=Bar' }
+    let(:query) { { sort: :asc, foo: 'Bar' } }
+    let(:expected_query) { 'name=Mike&test=xyz&sort=asc&foo=Bar&order=desc' }
 
     before do
       router_class.query_builder :query_params
+      router_class.query_param :name, :name
+      router_class.query_param(:test) { 'xyz' }
       router.name = 'Mike'
     end
 
-    it { expect(subject).to eq(expected_query) }
+    it 'resolves class-level symbols and blocks and sends route and request values as given' do
+      expect(subject).to eq(expected_query)
+    end
   end
 
   describe '.body_builder' do
@@ -570,8 +574,7 @@ describe ClientApiBuilder::Router do
       {
         headers: {
           'X-Frame' => 'top',
-          'X-Prev-Request-Count' => :request_count,
-          'X-Request-Count' => proc { request_count + 2 }
+          'X-Mode' => :fast
         }
       }
     end
@@ -579,10 +582,9 @@ describe ClientApiBuilder::Router do
       {
         'Content-Type' => 'application/json',
         'Authorization' => authorization,
-        'X-Tracking' => (request_count + 1),
+        'X-Tracking' => (request_count + 1).to_s,
         'X-Frame' => 'top',
-        'X-Prev-Request-Count' => request_count,
-        'X-Request-Count' => (request_count + 2)
+        'X-Mode' => 'fast'
       }
     end
 

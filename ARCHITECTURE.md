@@ -40,9 +40,9 @@ The `Router` module is the core component that provides the main functionality f
 - `namespace`: Groups routes under a common path prefix
 
 **Instance Methods**:
-- `build_headers`: Constructs request headers, evaluating procs/symbols
+- `build_headers`: Constructs request headers: class-level symbols/procs are resolved (`resolve_config_value`), per-request headers are merged as given, values become strings and `nil` drops a header
 - `build_connection_options`: Merges default and request-specific options
-- `build_query`: Formats query parameters using configured builder
+- `build_query`: Resolves class-level `query_param` symbols/procs, merges route and per-request values as given, and formats them with the configured builder
 - `build_body`: Formats request body using configured builder
 - `build_uri`: Constructs full URI with base_url, path, and query
 - `handle_response`: Processes API responses, parses JSON by default
@@ -110,7 +110,7 @@ Key behaviors:
 - Overrides `base_url` to fall back to root_router's base_url
 - Delegates `handle_response` to root_router, so response blocks run on the root client
 - Overrides `get_instance_method` so `{name}` path values call `root_router.name` (still passed through `escape_path`)
-- Header and query param symbols and procs are evaluated on root_router (as on any router)
+- Class-level header and query param symbols and procs are evaluated on root_router (as on any router)
 - Has its own `default_options`: headers, query params, connection options, retries and builders are not inherited from the root router
 - `nested_router_options` are stored but not read by the library
 

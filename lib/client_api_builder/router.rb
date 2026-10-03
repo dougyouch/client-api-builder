@@ -442,24 +442,12 @@ module ClientApiBuilder
       self.class.base_url
     end
 
+    # Class-level headers may be method names or blocks; per-request headers are used as given.
+    # Values are converted to strings, as Net::HTTP requires; nil values are left out of the request.
     def build_headers(options)
-      headers = {}
-
-      add_header_proc = proc do |name, value|
-        headers[name] =
-          if value.is_a?(Proc)
-            root_router.instance_eval(&value)
-          elsif value.is_a?(Symbol)
-            root_router.send(value)
-          else
-            value
-          end
-      end
-
-      self.class.default_headers.each(&add_header_proc)
-      options[:headers]&.each(&add_header_proc)
-
-      headers
+      headers = self.class.default_headers.transform_values { |value| resolve_config_value(value) }
+      headers.merge!(options[:headers]) if options[:headers]
+      headers.transform_values { |value| value&.to_s }
     end
 
     def build_connection_options(options)
@@ -470,25 +458,24 @@ module ClientApiBuilder
       end
     end
 
+    # Class-level query params may be method names or blocks; values from route arguments
+    # and per-request options are sent as given.
     def build_query(query, options)
-      query_params = {}
-
-      add_query_param_proc = proc do |name, value|
-        query_params[name] =
-          if value.is_a?(Proc)
-            root_router.instance_eval(&value)
-          elsif value.is_a?(Symbol)
-            root_router.send(value)
-          else
-            value
-          end
-      end
-
-      self.class.default_query_params.each(&add_query_param_proc)
-      query&.each(&add_query_param_proc)
-      options[:query]&.each(&add_query_param_proc)
+      query_params = self.class.default_query_params.transform_values { |value| resolve_config_value(value) }
+      query_params.merge!(query) if query
+      query_params.merge!(options[:query]) if options[:query]
 
       query_params.empty? ? nil : self.class.build_query(self, query_params)
+    end
+
+    # Resolves a class-level header or query_param value: a Symbol calls that method and a
+    # Proc is evaluated, both on the root router; anything else is used as is.
+    def resolve_config_value(value)
+      case value
+      when Proc then root_router.instance_eval(&value)
+      when Symbol then root_router.send(value)
+      else value
+      end
     end
 
     def build_body(body, options)
