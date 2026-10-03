@@ -223,7 +223,7 @@ end
 - `ClientApiBuilder::UnexpectedResponse`: Raised when response code doesn't match expected codes
   - Stores `response` for inspection
   - Also raised for response bodies that aren't valid JSON
-- Response procs: Per-route custom response handling stored in `default_options[:response_procs]`; a block passed to the call takes precedence
+- Response procs: Per-route custom response handling stored in `default_options[:response_procs]`; a block passed to the call takes precedence. `route` always records its block (nil clears it), so redefining a route without a block drops the previous or inherited one
 - Retry on exception: `retry_request?` returns true only for network errors (`Net::OpenTimeout`, `Net::ReadTimeout`, `Errno::ECONNRESET`, `Errno::ECONNREFUSED`, `Errno::ETIMEDOUT`, `SocketError`, `EOFError`); override to customize
 - Retries count total attempts: `configure_retries 3` makes at most 3 attempts, and the default of 1 means no retries
 

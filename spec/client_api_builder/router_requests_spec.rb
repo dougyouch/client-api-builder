@@ -211,6 +211,43 @@ describe ClientApiBuilder::Router do
     end
   end
 
+  describe 'redefining a route' do
+    let(:base_class) do
+      Class.new do
+        include ClientApiBuilder::Router
+
+        base_url 'http://example.com'
+
+        route(:get_token, '/v1/token') { |data| "v1 block: #{data['token']}" }
+      end
+    end
+
+    before { stub_request(:get, %r{http://example.com/v\d/token}).to_return(body: '{"token":"t1"}') }
+
+    it 'clears the block when redefined without one in the same class' do
+      base_class.route :get_token, '/v2/token'
+
+      expect(base_class.new.get_token).to eq('token' => 't1')
+    end
+
+    it 'clears an inherited block when a subclass redefines the route without one' do
+      child_class = Class.new(base_class) { route :get_token, '/v2/token' }
+
+      expect(child_class.new.get_token).to eq('token' => 't1')
+      expect(base_class.new.get_token).to eq('v1 block: t1')
+    end
+
+    it 'uses a new block when redefined with one' do
+      child_class = Class.new(base_class) { route(:get_token, '/v2/token') { |data| "v2 block: #{data['token']}" } }
+
+      expect(child_class.new.get_token).to eq('v2 block: t1')
+    end
+
+    it 'lets a block passed on the call override the route block' do
+      expect(base_class.new.get_token { |data| "call block: #{data['token']}" }).to eq('call block: t1')
+    end
+  end
+
   describe 'literal colons in paths' do
     let(:router_class) do
       Class.new do

@@ -64,7 +64,7 @@ module ClientApiBuilder
         }.freeze
       end
 
-      # tracks the proc used to handle responses
+      # tracks the proc used to handle responses; nil clears it
       def add_response_proc(method_name, proc)
         response_procs = deep_dup_hash(default_options[:response_procs])
         response_procs[method_name] = proc
@@ -468,8 +468,10 @@ module ClientApiBuilder
         "#{code}end\n"
       end
 
+      # A route definition is complete: redefining a route without a block also clears the
+      # previous block, including one inherited from a parent class
       def route(method_name, path, options = {}, &block)
-        add_response_proc(method_name, block) if block
+        add_response_proc(method_name, block)
 
         class_eval generate_route_code(method_name, path, options), __FILE__, __LINE__
       end

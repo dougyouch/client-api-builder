@@ -460,6 +460,8 @@ client.get_user(id: 1) { |data| data['name'] }
 
 Blocks run on the client, so they can call its methods and set its state. Empty response bodies return `nil`.
 
+Redefining a route, in the same class or a subclass, replaces the whole definition including its block; without a block it goes back to the default handling. Pass the block again to keep it.
+
 ### Error Handling
 
 `ClientApiBuilder::UnexpectedResponse` is raised when the status code isn't expected (any non-2xx by default, or anything outside `expected_response_code(s)`) and when a response body isn't valid JSON. It carries the response:
