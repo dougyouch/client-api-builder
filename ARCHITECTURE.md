@@ -128,6 +128,8 @@ def section(name, nested_router_options={}, &block)
 end
 ```
 
+Both methods are defined with closures (`define_singleton_method` / `define_method`) that capture the section class and options, so sections work on anonymous client classes and options can hold any object. Each client instance gets its own copy of `nested_router_options`. The name must be a plain identifier.
+
 ### 6. NetHTTP::Request Module
 
 Provides HTTP request execution using Net::HTTP:

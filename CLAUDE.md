@@ -52,7 +52,7 @@ script/console
 
 - **NestedRouter** (`lib/client_api_builder/nested_router.rb`): Base class for sections. Holds a `root_router` reference: it falls back to the root's `base_url`, delegates `handle_response` to it, and resolves `{name}` path values on it. It does **not** inherit the root's headers, query params, connection options or retry settings.
 
-- **Section** (`lib/client_api_builder/section.rb`): Provides `section` class method for creating nested route groups via dynamically generated classes.
+- **Section** (`lib/client_api_builder/section.rb`): Provides `section` class method for creating nested route groups via dynamically generated classes. `<name>_router` and `<name>` are defined with closures (not generated source), so sections work on anonymous classes.
 
 - **NetHTTP::Request** (`lib/client_api_builder/net_http_request.rb`): HTTP request execution using `Net::HTTP`. Handles standard requests and streaming (`:file`, `:io`, `:block` modes).
 
