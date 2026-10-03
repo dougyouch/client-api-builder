@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require 'spec_helper'
+require 'stringio'
 require 'tempfile'
 
 describe ClientApiBuilder::NetHTTP::Request do
@@ -162,6 +163,31 @@ describe ClientApiBuilder::NetHTTP::Request do
 
         expect(WebMock).to have_requested(:get, 'http://example.com/api')
       end
+    end
+
+    it 'yields the response to a block' do
+      yielded = nil
+      instance.request(
+        method: method, uri: uri, body: body, headers: headers,
+        connection_options: connection_options
+      ) { |response| yielded = response }
+
+      expect(yielded.body).to eq('{}')
+    end
+  end
+
+  describe '#stream_to_io' do
+    let(:uri) { URI('http://example.com/file') }
+
+    before do
+      stub_request(:get, 'http://example.com/file').to_return(status: 200, body: 'file contents')
+    end
+
+    it 'writes the streamed body to the IO' do
+      io = StringIO.new
+      instance.stream_to_io(method: :get, uri: uri, body: nil, headers: {}, connection_options: {}, io: io)
+
+      expect(io.string).to eq('file contents')
     end
   end
 end

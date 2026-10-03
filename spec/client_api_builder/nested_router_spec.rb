@@ -27,6 +27,8 @@ describe ClientApiBuilder::NestedRouter do
         route(:create_session, '/sessions', body: { username: :username, password: :password }, expected_response_code: 201) do |res|
           self.auth_token = res['session']['token']
         end
+
+        route :get_profile, '/profiles/{auth_token}'
       end
 
       section(:auth, ignore_headers: true, ignore_query: true) do
@@ -138,6 +140,20 @@ describe ClientApiBuilder::NestedRouter do
       end
 
       it { expect(subject).to eq(expected_code) }
+    end
+
+    describe 'instance methods in path' do
+      subject { router.login.get_profile }
+
+      before do
+        router.auth_token = 'tok123'
+        stub_request(:get, 'http://login.example.com/profiles/tok123?cachebuster=5')
+          .to_return(status: 200, body: { name: 'me' }.to_json)
+      end
+
+      it 'resolves them on the root router' do
+        expect(subject).to eq('name' => 'me')
+      end
     end
 
     describe 'block override' do

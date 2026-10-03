@@ -105,6 +105,21 @@ describe ClientApiBuilder::QueryParams do
       end
     end
 
+    describe 'hash with namespace' do
+      let(:data) { { a: 1, b: { c: 2 }, d: [3] } }
+      let(:namespace) { 'ns' }
+      let(:expected_query) { 'ns[a]=1&ns[b][c]=2&ns[d][]=3' }
+
+      it { is_expected.to eq(expected_query) }
+    end
+
+    describe 'hash with an array value and no namespace' do
+      let(:data) { { ids: [1, 2] } }
+      let(:expected_query) { 'ids[]=1&ids[]=2' }
+
+      it { is_expected.to eq(expected_query) }
+    end
+
     describe 'custom_escape_proc' do
       let(:custom_escape_proc) { proc { |str| CGI.escape(str).gsub('+', '%20') } }
 
