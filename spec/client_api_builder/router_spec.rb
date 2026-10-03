@@ -230,6 +230,16 @@ describe ClientApiBuilder::Router do
     it { expect(router_class.auto_detect_http_method('delete_user')).to eq(:delete) }
     it { expect(router_class.auto_detect_http_method('remove_user')).to eq(:delete) }
     it { expect(router_class.auto_detect_http_method('destroy_user')).to eq(:delete) }
+    it { expect(router_class.auto_detect_http_method('patch')).to eq(:patch) }
+    it { expect(router_class.auto_detect_http_method('post')).to eq(:post) }
+    it { expect(router_class.auto_detect_http_method('Create_User')).to eq(:post) }
+
+    %w[posts postal_codes addresses insertions deleted_users removed_items destroyed_records
+       updates_feed changelog patches createUser].each do |name|
+      it "treats #{name} as GET because the verb runs into the next word" do
+        expect(router_class.auto_detect_http_method(name)).to eq(:get)
+      end
+    end
     it { expect(router_class.auto_detect_http_method('patch_user')).to eq(:patch) }
     it { expect(router_class.auto_detect_http_method('unknown')).to eq(:get) }
   end

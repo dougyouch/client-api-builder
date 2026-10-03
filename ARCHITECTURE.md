@@ -89,7 +89,7 @@ When `method:` is not specified in route options, `auto_detect_http_method` infe
 | `delete`, `remove`, `destroy` | DELETE |
 | (default) | GET |
 
-The patterns match the start of the name with no word boundary, so `address_lookup` is a POST.
+The verb must be the whole name or be followed by `_` (`\A(?:delete|remove|destroy)(?:_|\z)`), so `deleted_users` and `posts` are GET.
 
 ### 4. Nested Router (`ClientApiBuilder::NestedRouter`)
 

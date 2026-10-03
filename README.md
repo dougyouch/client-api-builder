@@ -133,7 +133,7 @@ client.get_user(
 
 The Router detects the HTTP method from how the route name starts:
 
-| Name starts with | HTTP Method |
+| Name starts with the word | HTTP Method |
 |------------------|-------------|
 | `post`, `create`, `add`, `insert` | POST |
 | `put`, `update`, `modify`, `change` | PUT |
@@ -141,7 +141,7 @@ The Router detects the HTTP method from how the route name starts:
 | `delete`, `remove`, `destroy` | DELETE |
 | anything else | GET |
 
-The match is on the start of the name only, so `address_lookup` is a POST. Pass `method:` when the name doesn't say it.
+The verb must be the whole name or be followed by `_`: `create_user` and `delete` are detected, while names such as `posts`, `addresses`, `deleted_users` or `updates_feed` are GET. Pass `method:` when the name doesn't say it.
 
 ```ruby
 class MyApiClient

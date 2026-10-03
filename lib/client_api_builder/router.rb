@@ -170,15 +170,17 @@ module ClientApiBuilder
         end
       end
 
+      # The verb must be the whole name or be followed by '_', so create_user is a POST
+      # but names such as posts or deleted_users stay GET.
       def auto_detect_http_method(method_name)
         case method_name.to_s
-        when /^(?:post|create|add|insert)/i
+        when /\A(?:post|create|add|insert)(?:_|\z)/i
           :post
-        when /^(?:put|update|modify|change)/i
+        when /\A(?:put|update|modify|change)(?:_|\z)/i
           :put
-        when /^(?:patch)/i
+        when /\Apatch(?:_|\z)/i
           :patch
-        when /^(?:delete|remove|destroy)/i
+        when /\A(?:delete|remove|destroy)(?:_|\z)/i
           :delete
         else
           :get

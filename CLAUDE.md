@@ -72,7 +72,7 @@ Keyword arguments come from `:param` path segments and symbol values in `query:`
 
 ### HTTP Method Auto-Detection
 
-Methods are auto-detected from the start of route names: `post/create/add/insert` → POST, `put/update/modify/change` → PUT, `patch` → PATCH, `delete/remove/destroy` → DELETE, others → GET. There's no word boundary (`address_lookup` → POST).
+Methods are auto-detected from the start of route names: `post/create/add/insert` → POST, `put/update/modify/change` → PUT, `patch` → PATCH, `delete/remove/destroy` → DELETE, others → GET. The verb must be the whole name or followed by `_` (`deleted_users`, `posts` → GET).
 
 ### Behaviors Worth Knowing
 
