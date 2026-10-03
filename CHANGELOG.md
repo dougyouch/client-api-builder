@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.7.1](https://github.com/dougyouch/client-api-builder/compare/v0.7.0...v0.7.1) (2026-10-03)
+
+
+### Bug Fixes
+
+* **router:** detect destroy_ routes as DELETE ([85604c4](https://github.com/dougyouch/client-api-builder/commit/85604c4d974c8483e292e700eb51a2c78e312b54))
+* **router:** url-encode path values ([76d6fb4](https://github.com/dougyouch/client-api-builder/commit/76d6fb4fa246b342e263322d06262cba6760c278))
+
 ## [0.7.0](https://github.com/dougyouch/client-api-builder/compare/v0.6.1...v0.7.0) (2026-10-03)
 
 
