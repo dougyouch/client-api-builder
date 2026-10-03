@@ -160,6 +160,28 @@ describe ClientApiBuilder::Router do
     end
   end
 
+  describe '.process_route_path' do
+    {
+      '/users/:id' => %w[id],
+      '/files/:name.:format' => %w[name format],
+      '/avatars/user-:id.png' => %w[id],
+      '/v1/items:batchGet' => [],
+      '/v1/{name}:cancel' => [],
+      '/v1/{project}/jobs/:job_id:cancel' => %w[job_id],
+      '/slots/12:30' => [],
+      '/books/urn:isbn:123' => [],
+      '/:_private/:x1' => %w[_private x1]
+    }.each do |path, arguments|
+      it "finds #{arguments.inspect} in #{path}" do
+        expect(router_class.process_route_path(path).last).to eq(arguments)
+      end
+    end
+
+    it 'keeps literal colons in the generated path' do
+      expect(router_class.process_route_path('/v1/jobs/:job_id:cancel').first).to eq('/v1/jobs/#{escape_path(job_id)}:cancel') # rubocop:disable Lint/InterpolationCheck
+    end
+  end
+
   describe '.generate_route_code with placeholders in text' do
     it 'renders an interpolated string' do
       code = router_class.generate_route_code(:search, '/search', query: { q: 'user:{user_id} state:open' })

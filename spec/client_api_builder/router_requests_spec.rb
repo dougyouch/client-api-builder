@@ -192,6 +192,45 @@ describe ClientApiBuilder::Router do
     end
   end
 
+  describe 'literal colons in paths' do
+    let(:router_class) do
+      Class.new do
+        include ClientApiBuilder::Router
+
+        base_url 'http://example.com'
+
+        route :batch_get_items, '/v1/items:batchGet', method: :post, body: { ids: :ids }
+        route :cancel_operation, '/v1/{operation}:cancel', method: :post, no_body: true
+        route :get_slot, '/slots/12:30'
+
+        def operation
+          'operations/op 1'
+        end
+      end
+    end
+
+    it 'sends a custom method suffix as is' do
+      stub = stub_request(:post, 'http://example.com/v1/items:batchGet').with(body: '{"ids":[1,2]}')
+
+      router.batch_get_items(ids: [1, 2])
+      expect(stub).to have_been_requested
+    end
+
+    it 'keeps the suffix after an escaped placeholder' do
+      stub = stub_request(:post, 'http://example.com/v1/operations%2Fop%201:cancel')
+
+      router.cancel_operation
+      expect(stub).to have_been_requested
+    end
+
+    it 'defines routes with numbers after a colon' do
+      stub = stub_request(:get, 'http://example.com/slots/12:30')
+
+      router.get_slot
+      expect(stub).to have_been_requested
+    end
+  end
+
   describe 'routes sharing a query hash' do
     let(:router_class) do
       shared = { app_id: :app_id }.freeze

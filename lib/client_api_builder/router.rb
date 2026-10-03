@@ -32,6 +32,10 @@ module ClientApiBuilder
       PLACEHOLDER = /\{([a-z0-9_]+)\}/i
       WHOLE_PLACEHOLDER = /\A\{([a-z0-9_]+)\}\z/i
 
+      # ':name' in a route path is an argument unless the colon follows a letter, digit, '_' or '}',
+      # so items:batchGet, {name}:cancel and 12:30 stay literal
+      PATH_PARAMETER = /(?<![a-z0-9_}]):([a-z_][a-z0-9_]*)/i
+
       # Deep duplicates hashes and arrays (at any depth) to prevent shared mutable state.
       # Other values are returned as is.
       def deep_dup(value)
@@ -295,7 +299,7 @@ module ClientApiBuilder
         end
 
         path_arguments = []
-        path = path.gsub(/:([a-z0-9_]+)/i) do |_match|
+        path = path.gsub(PATH_PARAMETER) do |_match|
           param_name = Regexp.last_match(1)
           path_arguments << param_name
           "#\{escape_path(#{param_name})}"

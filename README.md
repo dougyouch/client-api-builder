@@ -169,6 +169,8 @@ route :get_user, '/users/:id'
 # client.get_user(id: 1)
 ```
 
+A colon directly after a letter, digit, `_` or `}` is literal text, so paths like `/v1/items:batchGet`, `/v1/{name}:cancel` or `/slots/12:30` need no escaping. Parameter names start with a letter or `_`.
+
 `{name}` is filled from the client's own `name` method rather than an argument, which suits values like account IDs that are set once. If the route also has an argument called `name`, the argument is used instead (in sections, path values always come from the root client's method):
 
 ```ruby
