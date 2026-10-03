@@ -25,15 +25,18 @@ module ClientApiBuilder
       # Allowed URL schemes for base_url to prevent SSRF attacks
       ALLOWED_URL_SCHEMES = %w[http https].freeze
 
-      # Deep duplicates a hash to prevent shared mutable state
-      def deep_dup_hash(hash)
-        hash.transform_values do |value|
-          case value
-          when Hash then deep_dup_hash(value)
-          when Array then value.map { |v| v.is_a?(Hash) ? deep_dup_hash(v) : v }
-          else value
-          end
+      # Deep duplicates hashes and arrays (at any depth) to prevent shared mutable state.
+      # Other values are returned as is.
+      def deep_dup(value)
+        case value
+        when Hash then value.transform_values { |v| deep_dup(v) }
+        when Array then value.map { |v| deep_dup(v) }
+        else value
         end
+      end
+
+      def deep_dup_hash(hash)
+        deep_dup(hash)
       end
 
       def default_options
@@ -313,10 +316,12 @@ module ClientApiBuilder
         end
       end
 
+      # get_arguments rewrites values in place, so work on a copy of the caller's query/body
       def build_query_code(options)
         if options[:query]
-          query_arguments = get_arguments(options[:query])
-          str = value_to_code(options[:query])
+          query = deep_dup(options[:query])
+          query_arguments = get_arguments(query)
+          str = value_to_code(query)
           str = str.gsub(/"__\|\|(.+?)\|\|__"/) { Regexp.last_match(1) }
           [str, query_arguments.map(&:to_s)]
         else
@@ -326,8 +331,9 @@ module ClientApiBuilder
 
       def build_body_code(options, has_body_param)
         if options[:body]
-          body_arguments = get_arguments(options[:body])
-          str = value_to_code(options[:body])
+          body = deep_dup(options[:body])
+          body_arguments = get_arguments(body)
+          str = value_to_code(body)
           str = str.gsub(/"__\|\|(.+?)\|\|__"/) { Regexp.last_match(1) }
           [str, body_arguments.map(&:to_s), false]
         else

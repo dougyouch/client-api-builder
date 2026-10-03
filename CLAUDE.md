@@ -68,7 +68,7 @@ The `route` class method in Router uses `generate_route_code` to dynamically cre
 1. `method_name_raw_response` - Makes the HTTP request
 2. `method_name` - Wraps the request with retry logic and response handling
 
-Keyword arguments come from `:param` path segments and symbol values in `query:`/`body:`. `{name}` (or a `'{name}'` value) calls the client's `name` method instead. `router_spec.rb` asserts exact generated source, so changes to the generator usually need those expectations updated.
+Keyword arguments come from `:param` path segments and symbol values in `query:`/`body:`. `{name}` (or a `'{name}'` value) calls the client's `name` method instead. `router_spec.rb` asserts exact generated source, so changes to the generator usually need those expectations updated. `get_arguments` rewrites values in place, so the generator works on `deep_dup` copies; never pass the caller's `query:`/`body:` to it directly.
 
 ### HTTP Method Auto-Detection
 

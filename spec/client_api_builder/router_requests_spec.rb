@@ -112,6 +112,30 @@ describe ClientApiBuilder::Router do
     end
   end
 
+  describe 'routes sharing a query hash' do
+    let(:router_class) do
+      shared = { app_id: :app_id }.freeze
+
+      Class.new do
+        include ClientApiBuilder::Router
+
+        base_url 'http://example.com'
+
+        route :get_a, '/a', query: shared
+        route :get_b, '/b', query: shared
+      end
+    end
+
+    it 'sends the argument from every route' do
+      stub_a = stub_request(:get, 'http://example.com/a?app_id=1')
+      stub_b = stub_request(:get, 'http://example.com/b?app_id=2')
+
+      router.get_a(app_id: 1)
+      router.get_b(app_id: 2)
+      expect([stub_a, stub_b]).to all(have_been_requested)
+    end
+  end
+
   describe 'symbol values' do
     let(:router_class) do
       Class.new do

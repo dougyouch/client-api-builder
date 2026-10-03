@@ -46,6 +46,41 @@ describe ClientApiBuilder::Router do
     end
   end
 
+  describe '.deep_dup' do
+    it 'copies hashes and arrays at any depth' do
+      original = { list: [[{ a: 'b' }]] }
+      copy = router_class.deep_dup(original)
+
+      expect(copy).to eq(original)
+      expect(copy[:list][0][0]).not_to be(original[:list][0][0])
+    end
+  end
+
+  describe '.route with query and body hashes' do
+    let(:query) { { app_id: :app_id, filters: [{ tag: :tag }] } }
+    let(:body) { [{ name: :name }] }
+
+    it 'leaves the caller\'s hashes unchanged' do
+      router_class.route :create_a, '/a', query: query, body: body
+
+      expect(query).to eq(app_id: :app_id, filters: [{ tag: :tag }])
+      expect(body).to eq([{ name: :name }])
+    end
+
+    it 'lets routes share one hash' do
+      router_class.route :get_a, '/a', query: query
+      router_class.route :get_b, '/b', query: query
+
+      expect(router_class.instance_method(:get_b).parameters).to include(%i[keyreq app_id], %i[keyreq tag])
+    end
+
+    it 'accepts frozen hashes' do
+      frozen = { app_id: :app_id, nested: { tag: :tag }.freeze }.freeze
+
+      expect { router_class.route :create_c, '/c', query: frozen, body: frozen }.not_to raise_error
+    end
+  end
+
   describe '.configure_retries' do
     it 'sets max_retries and the sleep time between retries' do
       router_class.configure_retries(3, 0.5)
