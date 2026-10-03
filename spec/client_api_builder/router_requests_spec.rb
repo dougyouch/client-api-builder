@@ -112,6 +112,55 @@ describe ClientApiBuilder::Router do
     end
   end
 
+  describe 'placeholders in query and body strings' do
+    let(:router_class) do
+      Class.new do
+        include ClientApiBuilder::Router
+
+        base_url 'http://example.com'
+
+        route :search, '/search', query: { q: 'user:{user_id} state:{state}' }
+        route :create_doc, '/docs', body: { title: 'Report for {user_id}', count: '{count}', tags: ['{state}', 'v{count}'] }
+        route :create_note, '/notes', body: { text: %q(say "hi" \ #{ x } for {user_id}) }
+        route :get_user_items, '/users/:user_id/items', query: { owner: '{user_id}' }
+
+        def user_id
+          42
+        end
+
+        def state
+          'open'
+        end
+
+        def count
+          3
+        end
+      end
+    end
+
+    before { stub_request(:any, /example.com/) }
+
+    it 'fills in every placeholder and keeps the surrounding text' do
+      router.search
+      expect(URI.decode_www_form(router.request_options[:uri].query).to_h).to eq('q' => 'user:42 state:open')
+    end
+
+    it 'keeps the value type for a whole-string placeholder and interpolates text, including in arrays' do
+      router.create_doc
+      expect(JSON.parse(router.request_options[:body])).to eq('title' => 'Report for 42', 'count' => 3, 'tags' => %w[open v3])
+    end
+
+    it 'sends quotes, backslashes and interpolation syntax in the text literally' do
+      router.create_note
+      expect(JSON.parse(router.request_options[:body])).to eq('text' => %q(say "hi" \ #{ x } for 42))
+    end
+
+    it 'prefers a route argument over the client method of the same name' do
+      router.get_user_items(user_id: 7)
+      expect(router.request_options[:uri].query).to eq('owner=7')
+    end
+  end
+
   describe 'state after a failed attempt' do
     it 'clears the previous response when a request times out' do
       stub_request(:get, 'http://example.com/items')

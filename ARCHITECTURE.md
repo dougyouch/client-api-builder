@@ -72,7 +72,8 @@ Generates:
 - `get_user(id:, **__options__, &block)` - Wraps raw_response with retry logic, response code validation, and response handling
 
 **Keyword arguments** come from `:param` segments in the path and symbol values in `body:` and `query:`. Routes that need a body but don't define one get a `body:` argument, and streaming routes get `file:` or `io:`.
-**Instance values**: `{name}` in the path, or a `'{name}'` string value in `body:`/`query:`, compiles to a call to the client's `name` method instead of an argument.
+**Instance values**: `{name}` in the path, or in a `body:`/`query:` string, compiles to a bare `name` reference, so it uses a route argument of that name if there is one and otherwise calls the client's method. A string that is exactly `'{name}'` passes the value through with its type; placeholders within text compile to an interpolated string (literal text escaped with `inspect`).
+**Code snippets**: `get_arguments` replaces these values with `ClassMethods::CodeSnippet` objects holding Ruby source, which `value_to_code` writes into the generated method verbatim.
 **Values in the generated code** are rendered by `value_to_code`, which keeps symbol keys as `key: value` so the output is the same on every Ruby version.
 
 `generate_route_code` rejects method names that aren't plain identifiers, since the name is interpolated into the generated source.

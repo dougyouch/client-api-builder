@@ -111,18 +111,34 @@ describe ClientApiBuilder::Router do
   end
 
   describe '.get_arguments' do
+    let(:code) { ->(source) { ClientApiBuilder::Router::ClassMethods::CodeSnippet.new(source) } }
+
     it 'collects symbols from an array and replaces instance method placeholders' do
       list = [:first, '{second}', 'plain', [:third], { fourth: :fourth }]
 
       expect(router_class.get_arguments(list)).to eq(%i[first third fourth])
-      expect(list).to eq(['__||first||__', '__||second||__', 'plain', ['__||third||__'], { fourth: '__||fourth||__' }])
+      expect(list).to eq([code['first'], code['second'], 'plain', [code['third']], { fourth: code['fourth'] }])
     end
 
     it 'replaces instance method placeholders in hash values and ignores other values' do
       hsh = { name: '{label}', count: 5 }
 
       expect(router_class.get_arguments(hsh)).to eq([])
-      expect(hsh).to eq(name: '__||label||__', count: 5)
+      expect(hsh).to eq(name: code['label'], count: 5)
+    end
+
+    it 'interpolates placeholders within text' do
+      hsh = { q: 'user:{user_id} state:{state}' }
+
+      router_class.get_arguments(hsh)
+      expect(hsh).to eq(q: code['"user:#{user_id} state:#{state}"']) # rubocop:disable Lint/InterpolationCheck
+    end
+
+    it 'keeps quotes, backslashes and interpolation syntax in the text literal' do
+      hsh = { q: %q(say "hi" \ #{ x } {name}) }
+
+      router_class.get_arguments(hsh)
+      expect(hsh[:q].code).to eq('"say \"hi\" \\\\ \#{ x } #{name}"') # rubocop:disable Lint/InterpolationCheck
     end
 
     it 'returns no arguments for other values' do
@@ -141,6 +157,14 @@ describe ClientApiBuilder::Router do
 
     it 'renders arrays, nil and booleans' do
       expect(router_class.value_to_code([nil, true, false, 'x'])).to eq('[nil, true, false, "x"]')
+    end
+  end
+
+  describe '.generate_route_code with placeholders in text' do
+    it 'renders an interpolated string' do
+      code = router_class.generate_route_code(:search, '/search', query: { q: 'user:{user_id} state:open' })
+
+      expect(code).to include('__query__ = {q: "user:#{user_id} state:open"}') # rubocop:disable Lint/InterpolationCheck
     end
   end
 

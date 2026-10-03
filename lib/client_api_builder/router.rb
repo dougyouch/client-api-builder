@@ -25,6 +25,13 @@ module ClientApiBuilder
       # Allowed URL schemes for base_url to prevent SSRF attacks
       ALLOWED_URL_SCHEMES = %w[http https].freeze
 
+      # Ruby source that value_to_code inserts verbatim into a generated route method
+      CodeSnippet = Data.define(:code)
+
+      # '{name}' in a query/body string: a route argument with that name, or else the client's method
+      PLACEHOLDER = /\{([a-z0-9_]+)\}/i
+      WHOLE_PLACEHOLDER = /\A\{([a-z0-9_]+)\}\z/i
+
       # Deep duplicates hashes and arrays (at any depth) to prevent shared mutable state.
       # Other values are returned as is.
       def deep_dup(value)
@@ -197,46 +204,54 @@ module ClientApiBuilder
         REQUIRED_BODY_HTTP_METHODS.include?(http_method)
       end
 
+      # Replaces argument symbols and '{name}' strings in a query/body hash, in place, with
+      # CodeSnippets; returns the argument names found
       def get_hash_arguments(hsh)
         arguments = []
-        hsh.each do |k, v|
-          case v
-          when Symbol
-            hsh[k] = "__||#{v}||__"
-            arguments << v
-          when Hash
-            arguments += get_hash_arguments(v)
-          when Array
-            arguments += get_array_arguments(v)
-          when String
-            # Use match with block form to avoid thread-unsafe $1 global variable
-            if (match = v.match(/\{([a-z0-9_]+)\}/i))
-              hsh[k] = "__||#{match[1]}||__"
-            end
-          end
-        end
+        hsh.each { |key, value| hsh[key] = argument_code(value, arguments) }
         arguments
       end
 
+      # Same as get_hash_arguments, for an array
       def get_array_arguments(list)
         arguments = []
-        list.each_with_index do |v, idx|
-          case v
-          when Symbol
-            list[idx] = "__||#{v}||__"
-            arguments << v
-          when Hash
-            arguments += get_hash_arguments(v)
-          when Array
-            arguments += get_array_arguments(v)
-          when String
-            # Use match with block form to avoid thread-unsafe $1 global variable
-            if (match = v.match(/\{([a-z0-9_]+)\}/i))
-              list[idx] = "__||#{match[1]}||__"
-            end
-          end
-        end
+        list.each_with_index { |value, idx| list[idx] = argument_code(value, arguments) }
         arguments
+      end
+
+      def argument_code(value, arguments)
+        case value
+        when Symbol
+          arguments << value
+          CodeSnippet.new(value.to_s)
+        when Hash
+          arguments.concat(get_hash_arguments(value))
+          value
+        when Array
+          arguments.concat(get_array_arguments(value))
+          value
+        when String
+          string_template_code(value)
+        else
+          value
+        end
+      end
+
+      # A string that is exactly '{name}' passes the value through unchanged (keeping its type);
+      # placeholders within text are interpolated into the string. Strings without placeholders
+      # are returned as is.
+      def string_template_code(str)
+        return str unless str.match?(PLACEHOLDER)
+
+        whole = str.match(WHOLE_PLACEHOLDER)
+        return CodeSnippet.new(whole[1]) if whole
+
+        parts = str.split(/(\{[a-z0-9_]+\})/i).map do |part|
+          placeholder = part.match(WHOLE_PLACEHOLDER)
+          # inspect escapes quotes, backslashes and '#{' so the text stays literal
+          placeholder ? "\#{#{placeholder[1]}}" : part.inspect[1..-2]
+        end
+        CodeSnippet.new("\"#{parts.join}\"")
       end
 
       # returns a list of arguments to add to the route method
@@ -311,6 +326,8 @@ module ClientApiBuilder
           'nil'
         when TrueClass, FalseClass
           value.to_s
+        when CodeSnippet
+          value.code
         else
           value.inspect
         end
@@ -321,9 +338,7 @@ module ClientApiBuilder
         if options[:query]
           query = deep_dup(options[:query])
           query_arguments = get_arguments(query)
-          str = value_to_code(query)
-          str = str.gsub(/"__\|\|(.+?)\|\|__"/) { Regexp.last_match(1) }
-          [str, query_arguments.map(&:to_s)]
+          [value_to_code(query), query_arguments.map(&:to_s)]
         else
           ['nil', []]
         end
@@ -333,9 +348,7 @@ module ClientApiBuilder
         if options[:body]
           body = deep_dup(options[:body])
           body_arguments = get_arguments(body)
-          str = value_to_code(body)
-          str = str.gsub(/"__\|\|(.+?)\|\|__"/) { Regexp.last_match(1) }
-          [str, body_arguments.map(&:to_s), false]
+          [value_to_code(body), body_arguments.map(&:to_s), false]
         else
           [has_body_param ? 'body' : 'nil', [], has_body_param]
         end

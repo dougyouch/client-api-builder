@@ -169,7 +169,7 @@ route :get_user, '/users/:id'
 # client.get_user(id: 1)
 ```
 
-`{name}` is filled from the client's own `name` method rather than an argument, which suits values like account IDs that are set once:
+`{name}` is filled from the client's own `name` method rather than an argument, which suits values like account IDs that are set once. If the route also has an argument called `name`, the argument is used instead (in sections, path values always come from the root client's method):
 
 ```ruby
 attr_accessor :account_id
@@ -178,7 +178,15 @@ route :get_invoices, '/accounts/{account_id}/invoices'
 # client.get_invoices
 ```
 
-The same `'{name}'` form works as a value inside `query:` and `body:`.
+The same `{name}` form works inside `query:` and `body:` strings. A string that is exactly `'{name}'` passes the value through unchanged, so numbers, arrays and hashes keep their type. Placeholders within text are filled in as strings, and every one is used:
+
+```ruby
+route :search_issues, '/issues', query: { q: 'author:{username} state:{state}' }
+route :create_report, '/reports', body: { title: 'Report for {username}', limit: '{page_size}' }
+# q=author:octocat state:open    {"title":"Report for octocat","limit":50}
+```
+
+Any `{identifier}` in these strings is a placeholder; other text, including quotes and `#{...}`, is sent literally. Top-level String bodies (`body: '...'`) are always sent as is.
 
 Path values, from arguments and `{name}` alike, are percent-encoded so each stays a single segment: `get_file(name: 'a/b c')` requests `/files/a%2Fb%20c`. Only RFC 3986 unreserved characters (`A-Z a-z 0-9 - . _ ~`) are left as is. To change this, override `escape_path`:
 
