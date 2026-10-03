@@ -2,6 +2,7 @@
 
 require 'spec_helper'
 require 'stringio'
+require 'fileutils'
 require 'tempfile'
 require 'tmpdir'
 
@@ -150,7 +151,31 @@ describe ClientApiBuilder::NetHTTP::Request do
             method: method, uri: uri, body: body, headers: headers,
             connection_options: {}, file: "/tmp/test\0.txt"
           )
-        end.to raise_error(ArgumentError)
+        end.to raise_error(ArgumentError, 'Invalid file path: contains a null byte')
+      end
+
+      ['../x', 'a/../b', 'a/..', '..', 'a\\..\\b'].each do |file|
+        it "rejects the parent segment in #{file.inspect}" do
+          expect do
+            instance.stream_to_file(method: method, uri: uri, body: body, headers: headers,
+                                    connection_options: {}, file: file)
+          end.to raise_error(ArgumentError, /path traversal/)
+        end
+      end
+    end
+
+    context 'with names that only contain ..' do
+      %w[report..v2.csv ..hidden a..b/c].each do |name|
+        it "accepts #{name.inspect}" do
+          Dir.mktmpdir do |dir|
+            path = File.join(dir, name)
+            FileUtils.mkdir_p(File.dirname(path))
+
+            instance.stream_to_file(method: method, uri: uri, body: body, headers: headers,
+                                    connection_options: {}, file: path)
+            expect(File.read(path)).to eq('data')
+          end
+        end
       end
     end
 

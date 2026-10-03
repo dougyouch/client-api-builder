@@ -108,14 +108,20 @@ module ClientApiBuilder
         raise ArgumentError, "Invalid file mode: #{mode.inspect}. Allowed modes: #{ALLOWED_FILE_MODES.join(', ')}"
       end
 
-      # Validate file path - expand to absolute path and check for path traversal
+      # Rejects null bytes and any '..' path segment, so a name built from untrusted input
+      # can't climb out of the directory the caller put it in. Names merely containing '..'
+      # (report..v2.csv) are fine. Absolute paths are allowed: the caller decides where files go.
       def stream_file_path(file)
-        expanded_path = File.expand_path(file)
-        if file.to_s.include?('..') || expanded_path.include?("\0")
-          raise ArgumentError, 'Invalid file path: potential path traversal detected'
-        end
+        path = file.to_s
+        raise ArgumentError, 'Invalid file path: contains a null byte' if path.include?("\0")
+        raise ArgumentError, 'Invalid file path: potential path traversal detected' if parent_segment?(path)
 
-        expanded_path
+        File.expand_path(path)
+      end
+
+      # Splits on both separators so the rule is the same on every platform
+      def parent_segment?(path)
+        path.split(%r{[/\\]}).include?('..')
       end
     end
   end

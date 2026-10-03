@@ -581,13 +581,18 @@ Values inserted into a route's path are percent-encoded, so input such as `../ad
 
 ### Path Traversal Protection
 
-File streaming rejects any path containing `..` or a null byte:
+File streaming rejects a path with a `..` segment or a null byte, so a file name built from untrusted input can't climb out of the directory you put it in:
 
 ```ruby
-# These will raise ArgumentError
-client.download_file(id: 1, file: '/tmp/../etc/passwd')
+# These raise ArgumentError
+client.download_file(id: 1, file: "/downloads/#{'../etc/passwd'}")
 client.download_file(id: 1, file: "/tmp/file\0.txt")
+
+# Names that only contain dots are fine
+client.download_file(id: 1, file: '/downloads/report..v2.csv')
 ```
+
+Absolute paths and symlinks are not restricted, since only your code knows where files may go. If untrusted input can supply the whole path, validate it before passing it as `file:`.
 
 ### Safe File Modes
 

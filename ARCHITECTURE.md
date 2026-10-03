@@ -233,7 +233,7 @@ route :process, '/data', stream: :block    # stream with block for each chunk
 route :download, '/file', stream: true     # alias for :file
 ```
 
-`stream_to_file` takes the file mode from the `:file_mode` connection option (default `wb`, limited to `ALLOWED_FILE_MODES`) and rejects paths containing `..` or a null byte. It opens the file only after `validate_response` accepts the response, so an error never creates, truncates or appends to it. Streaming routes return the `Net::HTTPResponse`.
+`stream_to_file` takes the file mode from the `:file_mode` connection option (default `wb`, limited to `ALLOWED_FILE_MODES`) and rejects paths with a `..` segment (split on `/` or `\`) or a null byte; absolute paths are allowed. It opens the file only after `validate_response` accepts the response, so an error never creates, truncates or appends to it. Streaming routes return the `Net::HTTPResponse`.
 
 ## Dependencies
 
