@@ -2,7 +2,7 @@
 
 require 'spec_helper'
 
-describe ClientApiBuilder::Router, 'security features' do
+describe ClientApiBuilder::Router do
   let(:router_class) do
     Class.new do
       include ClientApiBuilder::Router

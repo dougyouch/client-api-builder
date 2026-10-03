@@ -9,6 +9,7 @@ describe ClientApiBuilder::ActiveSupportLogSubscriber do
   let(:log_output) { StringIO.new }
   let(:logger) { Logger.new(log_output) }
   let(:subscriber) { described_class.new(logger) }
+  let(:client_class) { Class.new { include ClientApiBuilder::Router } }
 
   describe '#initialize' do
     it 'sets the logger' do
@@ -26,13 +27,13 @@ describe ClientApiBuilder::ActiveSupportLogSubscriber do
       subscriber.subscribe!
 
       # Create a mock client
-      mock_client = double(
-        'client',
+      mock_client = instance_double(
+        client_class,
         request_options: {
           method: :get,
           uri: URI('http://example.com/users')
         },
-        response: double('response', code: '200')
+        response: instance_double(Net::HTTPResponse, code: '200')
       )
 
       ActiveSupport::Notifications.instrument('client_api_builder.request', client: mock_client) do
@@ -51,17 +52,17 @@ describe ClientApiBuilder::ActiveSupportLogSubscriber do
 
   describe '#generate_log_message' do
     let(:uri) { URI('https://api.example.com/v1/users') }
-    let(:mock_response) { double('response', code: '201') }
+    let(:mock_response) { instance_double(Net::HTTPResponse, code: '201') }
     let(:mock_client) do
-      double(
-        'client',
+      instance_double(
+        client_class,
         request_options: { method: :post, uri: uri },
         response: mock_response
       )
     end
     let(:event) do
-      double(
-        'event',
+      instance_double(
+        ActiveSupport::Notifications::Event,
         payload: { client: mock_client },
         duration: 150.5
       )
@@ -78,8 +79,8 @@ describe ClientApiBuilder::ActiveSupportLogSubscriber do
 
     context 'when response is nil' do
       let(:mock_client) do
-        double(
-          'client',
+        instance_double(
+          client_class,
           request_options: { method: :get, uri: uri },
           response: nil
         )
@@ -94,12 +95,12 @@ describe ClientApiBuilder::ActiveSupportLogSubscriber do
     context 'with different HTTP methods' do
       %i[get post put patch delete].each do |http_method|
         it "handles #{http_method.upcase} method" do
-          client = double(
-            'client',
+          client = instance_double(
+            client_class,
             request_options: { method: http_method, uri: uri },
             response: mock_response
           )
-          event = double('event', payload: { client: client }, duration: 100)
+          event = instance_double(ActiveSupport::Notifications::Event, payload: { client: client }, duration: 100)
 
           message = subscriber.generate_log_message(event)
           expect(message).to include(http_method.to_s.upcase)

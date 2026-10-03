@@ -75,13 +75,14 @@ module ClientApiBuilder
         uri = URI.parse(url.to_s)
         return if ALLOWED_URL_SCHEMES.include?(uri.scheme&.downcase)
 
-        raise ArgumentError, "Invalid base_url scheme: #{uri.scheme.inspect}. Allowed: #{ALLOWED_URL_SCHEMES.join(', ')}"
+        allowed = ALLOWED_URL_SCHEMES.join(', ')
+        raise ArgumentError, "Invalid base_url scheme: #{uri.scheme.inspect}. Allowed: #{allowed}"
       rescue URI::InvalidURIError => e
         raise ArgumentError, "Invalid base_url: #{e.message}"
       end
 
-      # set the builder to :to_json, :to_query, :query_params or specify a proc to handle building the request body payload
-      # or get the body builder
+      # set the builder to :to_json, :to_query, :query_params or specify a proc
+      # to handle building the request body payload, or get the body builder
       def body_builder(builder = nil, &block)
         return default_options[:body_builder] if builder.nil? && block.nil?
 
@@ -332,7 +333,7 @@ module ClientApiBuilder
       end
 
       def extract_expected_response_codes(options)
-        codes = options[:expected_response_codes] || (options[:expected_response_code] ? [options[:expected_response_code]] : [])
+        codes = options[:expected_response_codes] || Array(options[:expected_response_code])
         codes.map(&:to_s)
       end
 
@@ -374,7 +375,9 @@ module ClientApiBuilder
 
       def generate_route_code(method_name, path, options = {})
         # Validate method_name to prevent code injection
-        raise ArgumentError, "Invalid method name: #{method_name.inspect}" unless method_name.to_s.match?(/\A[a-z_][a-z0-9_]*\z/i)
+        unless method_name.to_s.match?(/\A[a-z_][a-z0-9_]*\z/i)
+          raise ArgumentError, "Invalid method name: #{method_name.inspect}"
+        end
 
         http_method = options[:method] || auto_detect_http_method(method_name)
         path, path_arguments = process_route_path(path)
@@ -410,7 +413,7 @@ module ClientApiBuilder
         code += "  @request_options = {method: #{ctx[:http_method].inspect}, uri: __uri__, body: __body__, " \
                 "headers: __headers__, connection_options: __connection_options__}\n"
         code += generate_request_call_code(ctx[:options], ctx[:stream_param])
-        code + "end\n\n"
+        "#{code}end\n\n"
       end
 
       def generate_wrapper_method(ctx)
@@ -424,7 +427,7 @@ module ClientApiBuilder
         code += "    expected_response_code!(@response, __expected_response_codes__, __options__)\n"
         code += generate_response_handling_code(ctx[:options])
         code += "  end\n"
-        code + "end\n"
+        "#{code}end\n"
       end
 
       def route(method_name, path, options = {}, &block)
@@ -577,7 +580,7 @@ module ClientApiBuilder
       end
     end
 
-    def get_retry_request_sleep_time(_e, options)
+    def get_retry_request_sleep_time(_exception, options)
       options[:sleep] || self.class.default_options[:sleep] || 0.05
     end
 

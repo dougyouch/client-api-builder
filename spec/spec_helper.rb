@@ -5,7 +5,6 @@ require 'bundler'
 require 'json'
 require 'securerandom'
 require 'simplecov'
-require 'simplecov-cobertura'
 require 'webmock/rspec'
 require 'active_support/core_ext/object/to_query'
 
@@ -13,16 +12,12 @@ SimpleCov.start do
   enable_coverage :branch
 
   add_filter '/spec/'
+  # loaded by the gemspec before SimpleCov starts, so it would always show as missed
+  add_filter 'lib/client_api_builder/version.rb'
 
   add_group 'Core', 'lib/client_api_builder'
 
   track_files 'lib/**/*.rb'
-
-  if ENV['CI']
-    formatter SimpleCov::Formatter::CoberturaFormatter
-  else
-    formatter SimpleCov::Formatter::HTMLFormatter
-  end
 end
 
 begin

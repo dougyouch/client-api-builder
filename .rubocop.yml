@@ -1,3 +1,8 @@
+# frozen_string_literal: true
+
+plugins:
+  - rubocop-rspec
+
 AllCops:
   TargetRubyVersion: 3.2
   NewCops: enable
@@ -6,35 +11,37 @@ AllCops:
     - 'bin/**/*'
     - 'vendor/**/*'
     - 'coverage/**/*'
+    - 'tmp/**/*'
+    - 'Gemfile.lock'
 
-# Relaxed metrics for existing codebase
 Metrics/MethodLength:
-  Max: 100
+  Max: 30
 
 Metrics/AbcSize:
-  Max: 80
+  Max: 35
+
+# Keyword options are how signatures grow without breaking positional callers
+Metrics/ParameterLists:
+  CountKeywordArgs: false
 
 Metrics/ClassLength:
   Max: 200
 
+# Router's ClassMethods holds the whole route DSL and code generator
 Metrics/ModuleLength:
   Max: 340
 
 Metrics/CyclomaticComplexity:
-  Max: 30
+  Max: 12
 
 Metrics/PerceivedComplexity:
-  Max: 30
+  Max: 12
 
 Metrics/BlockLength:
   Exclude:
     - 'spec/**/*'
     - '*.gemspec'
 
-Metrics/ParameterLists:
-  Max: 7
-
-# Style preferences
 Style/Documentation:
   Enabled: false
 
@@ -42,38 +49,40 @@ Style/FrozenStringLiteralComment:
   EnforcedStyle: always
 
 Layout/LineLength:
-  Max: 170
+  Max: 120
   Exclude:
     - 'spec/**/*'
 
-# File naming - allow hyphenated gem name
 Naming/FileName:
   Exclude:
     - 'lib/client-api-builder.rb'
 
-# Allow short parameter names for unused exception variables
-Naming/MethodParameterName:
-  AllowedNames:
-    - e
-    - _e
-    - io
 
-# Gemspec settings
-Gemspec/RequiredRubyVersion:
+# RSpec configuration
+RSpec/ExampleLength:
+  Max: 20
+
+RSpec/MultipleExpectations:
+  Max: 8
+
+RSpec/NestedGroups:
+  Max: 4
+
+RSpec/MultipleMemoizedHelpers:
+  Max: 20
+
+# Allow unnamed subject references
+RSpec/NamedSubject:
   Enabled: false
 
-# Style relaxations for existing code patterns
-Style/OptionalBooleanParameter:
+# Spec directory uses hyphens to match gem name
+RSpec/SpecFilePathFormat:
   Enabled: false
 
-Style/StringConcatenation:
+# Allow descriptive context names
+RSpec/ContextWording:
   Enabled: false
 
-Style/FormatStringToken:
+# Allow repeated describe blocks for different scenarios
+RSpec/RepeatedExampleGroupDescription:
   Enabled: false
-
-# Note: Previously had exclusions for Style/ClassVars, Style/PerlBackrefs, and
-# Lint/RescueException in router.rb - these have been fixed:
-# - ClassVars: Changed to thread-local storage
-# - PerlBackrefs: Changed to Regexp.last_match
-# - RescueException: Changed to StandardError

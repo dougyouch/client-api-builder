@@ -4,7 +4,7 @@ require 'spec_helper'
 
 describe ClientApiBuilder::NestedRouter do
   let(:router_class) do
-    class_name = 'TestRouter' + rand(1_000_000).to_s
+    class_name = "TestRouter#{rand(1_000_000)}"
     Module.const_set(class_name, Class.new)
     kls = Module.const_get(class_name)
     kls.class_eval do
@@ -48,7 +48,10 @@ describe ClientApiBuilder::NestedRouter do
   let(:router) { router_class.new }
 
   context 'section' do
+    subject { router.login.create_session(username: username, password: password) }
+
     let(:expected_auth_token) { SecureRandom.uuid }
+
     before do
       stub_request(:post, 'http://login.example.com/sessions?cachebuster=5')
         .with(
@@ -64,16 +67,18 @@ describe ClientApiBuilder::NestedRouter do
         .to_return(status: 201, body: { session: { token: expected_auth_token } }.to_json, headers: {})
     end
 
-    subject { router.login.create_session(username: username, password: password) }
-
     it { expect(subject).to eq(expected_auth_token) }
+
     it {
       subject
       expect(router.auth_token).to eq(expected_auth_token)
     }
 
     describe 'ignore_headers' do
+      subject { router.auth.create_session(username: username, password: password) }
+
       let(:expected_auth_token) { SecureRandom.uuid }
+
       before do
         stub_request(:post, 'http://auth.example.com/sessions')
           .with(
@@ -88,9 +93,8 @@ describe ClientApiBuilder::NestedRouter do
           .to_return(status: 201, body: { session: { token: expected_auth_token } }.to_json, headers: {})
       end
 
-      subject { router.auth.create_session(username: username, password: password) }
-
       it { expect(subject).to eq(expected_auth_token) }
+
       it {
         subject
         expect(router.auth_token).to eq(expected_auth_token)
@@ -98,6 +102,8 @@ describe ClientApiBuilder::NestedRouter do
     end
 
     describe 'code' do
+      subject { generated_code }
+
       let(:method_name) { :create_session }
       let(:path) { '/sessions' }
       let(:query) { nil }
@@ -105,9 +111,6 @@ describe ClientApiBuilder::NestedRouter do
       let(:expected_response_codes) { nil }
       let(:expected_response_code) { 201 }
       let(:generated_code) { router_class.login_router.generate_route_code(method_name, path, query: query, body: body, expected_response_codes: expected_response_codes, expected_response_code: expected_response_code) }
-
-      subject { generated_code }
-
       let(:expected_code) do
         <<~STR
           def create_session_raw_response(username:, password:, **__options__, &block)
@@ -140,10 +143,11 @@ describe ClientApiBuilder::NestedRouter do
     describe 'block override' do
       subject { router.login.create_session(username: username, password: password) { nil } }
 
-      it { expect(subject).to eq(nil) }
+      it { expect(subject).to be_nil }
+
       it {
         subject
-        expect(router.auth_token).to eq(nil)
+        expect(router.auth_token).to be_nil
       }
     end
   end

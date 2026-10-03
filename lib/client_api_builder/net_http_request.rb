@@ -51,7 +51,8 @@ module ClientApiBuilder
       end
 
       def stream(method:, uri:, body:, headers:, connection_options:)
-        request(method: method, uri: uri, body: body, headers: headers, connection_options: connection_options) do |response|
+        request(method: method, uri: uri, body: body, headers: headers,
+                connection_options: connection_options) do |response|
           response.read_body do |chunk|
             yield response, chunk
           end
@@ -59,7 +60,8 @@ module ClientApiBuilder
       end
 
       def stream_to_io(method:, uri:, body:, headers:, connection_options:, io:)
-        stream(method: method, uri: uri, body: body, headers: headers, connection_options: connection_options) do |_, chunk|
+        stream(method: method, uri: uri, body: body, headers: headers,
+               connection_options: connection_options) do |_, chunk|
           io.write chunk
         end
       end
@@ -75,12 +77,15 @@ module ClientApiBuilder
                elsif ALLOWED_FILE_MODES.include?(mode.to_s)
                  mode.to_s
                else
-                 raise ArgumentError, "Invalid file mode: #{mode.inspect}. Allowed modes: #{ALLOWED_FILE_MODES.join(', ')}"
+                 raise ArgumentError,
+                       "Invalid file mode: #{mode.inspect}. Allowed modes: #{ALLOWED_FILE_MODES.join(', ')}"
                end
 
         # Validate file path - expand to absolute path and check for path traversal
         expanded_path = File.expand_path(file)
-        raise ArgumentError, 'Invalid file path: potential path traversal detected' if file.to_s.include?('..') || expanded_path.include?("\0")
+        if file.to_s.include?('..') || expanded_path.include?("\0")
+          raise ArgumentError, 'Invalid file path: potential path traversal detected'
+        end
 
         File.open(expanded_path, mode) do |io|
           stream_to_io(method: method, uri: uri, body: body, headers: headers, connection_options: opts, io: io)

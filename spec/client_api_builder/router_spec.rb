@@ -44,16 +44,16 @@ describe ClientApiBuilder::Router do
   let(:expected_base_url) { 'http://example.com' }
   let(:expected_connection_options) { { open_timeout: 100 } }
 
-  context '.base_url' do
+  describe '.base_url' do
     subject { router_class.base_url }
 
     it { expect(subject).to eq(expected_base_url) }
   end
 
-  context '.query_builder' do
-    let(:builder) { :to_query }
+  describe '.query_builder' do
     subject { router_class.query_builder }
 
+    let(:builder) { :to_query }
     let(:expected_query_builder) { :to_query }
 
     before do
@@ -63,9 +63,10 @@ describe ClientApiBuilder::Router do
     it { expect(subject).to eq(builder) }
 
     describe 'build query' do
+      subject { router.class.build_query(router, query) }
+
       let(:query) { { name: 'Foo Bar' } }
       let(:expected_query) { 'name=Foo+Bar' }
-      subject { router.class.build_query(router, query) }
 
       it { expect(subject).to eq(expected_query) }
 
@@ -110,7 +111,9 @@ describe ClientApiBuilder::Router do
     end
   end
 
-  context '#build_query' do
+  describe '#build_query' do
+    subject { router.build_query(query, {}) }
+
     let(:query) { { name: :name, test: proc { 'xyz' }, foo: 'Bar' } }
     let(:expected_query) { 'name=Mike&test=xyz&foo=Bar' }
 
@@ -119,15 +122,13 @@ describe ClientApiBuilder::Router do
       router.name = 'Mike'
     end
 
-    subject { router.build_query(query, {}) }
-
     it { expect(subject).to eq(expected_query) }
   end
 
-  context '.body_builder' do
-    let(:builder) { :to_query }
+  describe '.body_builder' do
     subject { router_class.body_builder }
 
+    let(:builder) { :to_query }
     let(:expected_query_builder) { :to_query }
 
     before do
@@ -137,9 +138,10 @@ describe ClientApiBuilder::Router do
     it { expect(subject).to eq(builder) }
 
     describe 'build body' do
+      subject { router.class.build_body(router, body) }
+
       let(:body) { { name: 'Foo Bar' } }
       let(:expected_body) { 'name=Foo+Bar' }
-      subject { router.class.build_body(router, body) }
 
       it { expect(subject).to eq(expected_body) }
 
@@ -184,7 +186,7 @@ describe ClientApiBuilder::Router do
     end
   end
 
-  context '.default_headers' do
+  describe '.default_headers' do
     subject { router_class.default_headers }
 
     let(:expected_headers) do
@@ -211,13 +213,13 @@ describe ClientApiBuilder::Router do
     end
   end
 
-  context '.default_connection_options' do
+  describe '.default_connection_options' do
     subject { router_class.default_connection_options }
 
     it { expect(subject).to eq(expected_connection_options) }
   end
 
-  context '.auto_detect_http_method' do
+  describe '.auto_detect_http_method' do
     it { expect(router_class.auto_detect_http_method('get_user')).to eq(:get) }
     it { expect(router_class.auto_detect_http_method('create_user')).to eq(:post) }
     it { expect(router_class.auto_detect_http_method('update_user')).to eq(:put) }
@@ -226,7 +228,9 @@ describe ClientApiBuilder::Router do
     it { expect(router_class.auto_detect_http_method('unknown')).to eq(:get) }
   end
 
-  context '.get_arguments' do
+  describe '.get_arguments' do
+    subject { router_class.get_arguments(query) }
+
     let(:query) do
       {
         foo: 'bar',
@@ -249,15 +253,17 @@ describe ClientApiBuilder::Router do
         ]
       }
     end
-
-    subject { router_class.get_arguments(query) }
-
     let(:expected_hash_arguments) { %i[name x name bar foo email] }
 
     it { expect(subject).to eq(expected_hash_arguments) }
   end
 
-  context '.route' do
+  describe '.route' do
+    subject do
+      router_class.route(method_name, path, query: query, body: body, expected_response_codes: expected_response_codes, expected_response_code: expected_response_code)
+      router_class.method_defined?(method_name)
+    end
+
     let(:method_name) { :create_user }
     let(:path) { '/v2/apps/:app_id/users' }
     let(:query) { { auth: :auth } }
@@ -266,10 +272,6 @@ describe ClientApiBuilder::Router do
     let(:expected_response_code) { nil }
 
     let(:generated_code) { router_class.generate_route_code(method_name, path, query: query, body: body, expected_response_codes: expected_response_codes, expected_response_code: expected_response_code) }
-    subject do
-      router_class.route(method_name, path, query: query, body: body, expected_response_codes: expected_response_codes, expected_response_code: expected_response_code)
-      router_class.method_defined?(method_name)
-    end
     let(:route_params) do
       {
         app_id: 8,
@@ -292,7 +294,6 @@ describe ClientApiBuilder::Router do
       stub_request(:post, 'http://example.com/v2/apps/8/users?auth=secret')
         .to_return(status: 201, body: expected_route_return_value.to_json)
     end
-
     let(:expected_code) do
       <<~CODE
         def create_user_raw_response(app_id:, auth:, name:, email:, **__options__, &block)
@@ -320,7 +321,8 @@ describe ClientApiBuilder::Router do
     end
 
     it { expect(generated_code).to eq(expected_code) }
-    it { expect(subject).to eq(true) }
+    it { expect(subject).to be(true) }
+
     it {
       subject
       create_stubbed_response
@@ -370,7 +372,8 @@ describe ClientApiBuilder::Router do
       end
 
       it { expect(generated_code).to eq(expected_code) }
-      it { expect(subject).to eq(true) }
+      it { expect(subject).to be(true) }
+
       it {
         subject
         create_stubbed_response
@@ -420,7 +423,8 @@ describe ClientApiBuilder::Router do
       end
 
       it { expect(generated_code).to eq(expected_code) }
-      it { expect(subject).to eq(true) }
+      it { expect(subject).to be(true) }
+
       it {
         subject
         create_stubbed_response
@@ -473,7 +477,8 @@ describe ClientApiBuilder::Router do
       let(:expected_route_return_value) { nil }
 
       it { expect(generated_code).to eq(expected_code) }
-      it { expect(subject).to eq(true) }
+      it { expect(subject).to be(true) }
+
       it {
         subject
         create_stubbed_response
@@ -515,7 +520,7 @@ describe ClientApiBuilder::Router do
       end
 
       it { expect(generated_code).to eq(expected_code) }
-      it { expect(subject).to eq(true) }
+      it { expect(subject).to be(true) }
     end
 
     describe 'instance methods in path' do
@@ -552,11 +557,13 @@ describe ClientApiBuilder::Router do
       end
 
       it { expect(generated_code).to eq(expected_code) }
-      it { expect(subject).to eq(true) }
+      it { expect(subject).to be(true) }
     end
   end
 
-  context '.build_headers' do
+  describe '.build_headers' do
+    subject { router.build_headers(route_options) }
+
     let(:route_options) do
       {
         headers: {
@@ -566,7 +573,6 @@ describe ClientApiBuilder::Router do
         }
       }
     end
-    subject { router.build_headers(route_options) }
     let(:expected_headers) do
       {
         'Content-Type' => 'application/json',

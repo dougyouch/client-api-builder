@@ -37,10 +37,10 @@ BasicAuthExampleClient = Struct.new(
   end
 
   def basic_authorization
-    'basic ' + Base64.strict_encode64(username + ':' + password)
+    "basic #{Base64.strict_encode64("#{username}:#{password}")}"
   end
 
   def bearer_authorization
-    'bearer ' + auth_token
+    "bearer #{auth_token}"
   end
 end
