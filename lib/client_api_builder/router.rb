@@ -88,10 +88,11 @@ module ClientApiBuilder
       # Validates that base_url uses an allowed scheme
       def validate_base_url!(url)
         uri = URI.parse(url.to_s)
-        return if ALLOWED_URL_SCHEMES.include?(uri.scheme&.downcase)
-
-        allowed = ALLOWED_URL_SCHEMES.join(', ')
-        raise ArgumentError, "Invalid base_url scheme: #{uri.scheme.inspect}. Allowed: #{allowed}"
+        unless ALLOWED_URL_SCHEMES.include?(uri.scheme&.downcase)
+          allowed = ALLOWED_URL_SCHEMES.join(', ')
+          raise ArgumentError, "Invalid base_url scheme: #{uri.scheme.inspect}. Allowed: #{allowed}"
+        end
+        raise ArgumentError, "Invalid base_url: #{url.to_s.inspect} has no host" if uri.host.to_s.empty?
       rescue URI::InvalidURIError => e
         raise ArgumentError, "Invalid base_url: #{e.message}"
       end
@@ -525,14 +526,26 @@ module ClientApiBuilder
 
     def build_uri(path, query, options)
       # Properly join base_url and path to handle missing/extra slashes
-      base = base_url.to_s
-      base = base.chomp('/') if base.end_with?('/')
+      base = validated_base_url.chomp('/')
       path = path.to_s
       path = "/#{path}" unless path.start_with?('/')
 
       uri = URI(base + path)
       uri.query = build_query(query, options)
       uri
+    end
+
+    # The base URL used for this request, checked every time so a base_url method defined on
+    # the client gets the same scheme and host check as the class-level base_url
+    def validated_base_url
+      url = base_url.to_s
+      if url.empty?
+        raise ArgumentError, "no base_url configured for #{self.class.name || self.class.inspect}; set one with " \
+                             "base_url 'https://api.example.com' or define a base_url method"
+      end
+
+      self.class.validate_base_url!(url)
+      url
     end
 
     def expected_response_code!(response, expected_response_codes, _options)

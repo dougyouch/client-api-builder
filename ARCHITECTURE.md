@@ -45,7 +45,7 @@ The `Router` module is the core component that provides the main functionality f
 - `build_connection_options`: Merges default and request-specific options
 - `build_query`: Resolves class-level `query_param` symbols/procs, merges route and per-request values as given, and formats them with the configured builder
 - `build_body`: Formats request body using configured builder
-- `build_uri`: Constructs full URI with base_url, path, and query
+- `build_uri`: Constructs full URI with base_url, path, and query; `validated_base_url` checks the effective base URL (set, http/https, has a host) on every request, so `base_url` method overrides are validated too
 - `handle_response`: Processes API responses, parses JSON by default
 - `request_wrapper`: Manages request execution with retry and instrumentation; clears `@request_options` and `@response` before each attempt
 - `expected_response_code!`: Raises `UnexpectedResponse` unless the code is expected (any 2xx when none are configured)

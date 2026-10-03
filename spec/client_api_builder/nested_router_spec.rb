@@ -174,4 +174,25 @@ describe ClientApiBuilder::NestedRouter do
       }
     end
   end
+
+  describe 'a section without its own base_url' do
+    let(:router_class) do
+      stub_const('FallbackClient', Class.new { include ClientApiBuilder::Router })
+      FallbackClient.class_eval do
+        base_url 'https://api.example.com'
+
+        section :users do
+          route :list_users, '/users'
+        end
+      end
+      FallbackClient
+    end
+
+    it 'uses the root base_url' do
+      stub = stub_request(:get, 'https://api.example.com/users')
+
+      router.users.list_users
+      expect(stub).to have_been_requested
+    end
+  end
 end

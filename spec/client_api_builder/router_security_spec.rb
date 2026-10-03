@@ -73,6 +73,13 @@ describe ClientApiBuilder::Router do
     end
   end
 
+  describe '.validate_base_url! host check' do
+    it 'rejects a URL without a host' do
+      expect { router_class.validate_base_url!('http://') }
+        .to raise_error(ArgumentError, 'Invalid base_url: "http://" has no host')
+    end
+  end
+
   describe '.base_url with validation' do
     it 'sets valid http base_url' do
       test_class = Class.new do
@@ -253,6 +260,50 @@ describe ClientApiBuilder::Router do
 
         uri = test_router.build_uri('/users', nil, {})
         expect(uri.to_s).to eq('http://example.com/users')
+      end
+    end
+
+    context 'when the base URL is missing or invalid' do
+      def client_with(&block)
+        Class.new do
+          include ClientApiBuilder::Router
+
+          class_eval(&block) if block
+        end.new
+      end
+
+      it 'raises a clear error when no base_url is configured' do
+        expect { client_with.build_uri('/users', nil, {}) }
+          .to raise_error(ArgumentError, /\Ano base_url configured for .*; set one with base_url/)
+      end
+
+      it 'names the client class' do
+        stub_const('NamedClient', Class.new { include ClientApiBuilder::Router })
+
+        expect { NamedClient.new.build_uri('/users', nil, {}) }
+          .to raise_error(ArgumentError, /no base_url configured for NamedClient;/)
+      end
+
+      it 'raises when a base_url method returns nil' do
+        client = client_with do
+          base_url 'http://example.com'
+          define_method(:base_url) { nil }
+        end
+
+        expect { client.build_uri('/users', nil, {}) }.to raise_error(ArgumentError, /no base_url configured/)
+      end
+
+      it 'checks the scheme of a base_url method' do
+        expect { client_with { define_method(:base_url) { 'api.example.com' } }.build_uri('/users', nil, {}) }
+          .to raise_error(ArgumentError, 'Invalid base_url scheme: nil. Allowed: http, https')
+        expect { client_with { define_method(:base_url) { 'ftp://files.test' } }.build_uri('/users', nil, {}) }
+          .to raise_error(ArgumentError, 'Invalid base_url scheme: "ftp". Allowed: http, https')
+      end
+
+      it 'accepts a valid base_url method' do
+        client = client_with { define_method(:base_url) { 'https://tenant.example.com/v2' } }
+
+        expect(client.build_uri('/users', nil, {}).to_s).to eq('https://tenant.example.com/v2/users')
       end
     end
   end

@@ -566,7 +566,7 @@ HTTPS connections verify SSL certificates using `OpenSSL::SSL::VERIFY_PEER` and 
 
 ### SSRF Protection
 
-Base URLs are validated to only allow `http` and `https` schemes, preventing Server-Side Request Forgery attacks:
+Base URLs must use the `http` or `https` scheme and include a host, preventing Server-Side Request Forgery attacks:
 
 ```ruby
 class MyApiClient
@@ -578,6 +578,8 @@ class MyApiClient
   base_url 'ftp://example.com'        # Raises ArgumentError
 end
 ```
+
+The URL actually used is checked again on every request, so a `base_url` method defined on the client (for example, a per-tenant URL) gets the same check. A client with no base URL at all raises `ArgumentError: no base_url configured for MyApiClient` instead of failing inside Net::HTTP.
 
 ### Path Value Encoding
 
