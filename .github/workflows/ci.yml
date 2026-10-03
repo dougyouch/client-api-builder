@@ -59,7 +59,7 @@ jobs:
           include-hidden-files: true
           retention-days: 14
 
-  # Publishes coverage.svg to the orphan `badges` branch; the README badge points at it.
+  # Publishes coverage.svg and branches.svg to the orphan `badges` branch; the README badges point at them.
   # Skipped when called from release.yml (github.workflow is the caller's name there).
   coverage-badge:
     if: github.workflow == 'CI' && github.event_name == 'push' && github.ref == 'refs/heads/master'
@@ -76,7 +76,9 @@ jobs:
         with:
           name: coverage
           path: coverage/
-      - run: ruby script/coverage_badge.rb coverage/.last_run.json "$RUNNER_TEMP/coverage.svg"
+      - run: |
+          ruby script/coverage_badge.rb coverage/.last_run.json "$RUNNER_TEMP/coverage.svg"
+          ruby script/coverage_badge.rb coverage/.last_run.json "$RUNNER_TEMP/branches.svg" branch
       - name: Push badge to badges branch
         run: |
           git config user.name 'github-actions[bot]'
@@ -86,7 +88,7 @@ jobs:
           else
             git switch --orphan badges
           fi
-          cp "$RUNNER_TEMP/coverage.svg" coverage.svg
-          git add coverage.svg
+          cp "$RUNNER_TEMP/coverage.svg" "$RUNNER_TEMP/branches.svg" .
+          git add coverage.svg branches.svg
           git diff --cached --quiet || git commit -m "coverage badge for ${GITHUB_SHA::7}"
           git push origin badges

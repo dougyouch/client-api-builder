@@ -3,6 +3,7 @@
 [![Gem Version](https://badge.fury.io/rb/client-api-builder.svg)](https://badge.fury.io/rb/client-api-builder)
 [![CI](https://github.com/dougyouch/client-api-builder/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/dougyouch/client-api-builder/actions/workflows/ci.yml)
 [![Coverage](https://raw.githubusercontent.com/dougyouch/client-api-builder/badges/coverage.svg)](https://github.com/dougyouch/client-api-builder/actions/workflows/ci.yml)
+[![Branch Coverage](https://raw.githubusercontent.com/dougyouch/client-api-builder/badges/branches.svg)](https://github.com/dougyouch/client-api-builder/actions/workflows/ci.yml)
 
 A Ruby gem for building robust, secure API clients through declarative configuration. Define your API endpoints and their behavior with minimal boilerplate while benefiting from built-in security features, automatic retries, and comprehensive error handling.
 
