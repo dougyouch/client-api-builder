@@ -11,13 +11,11 @@ require 'active_support/core_ext/object/to_query'
 SimpleCov.start do
   enable_coverage :branch
 
-  add_filter '/spec/'
+  cover 'lib/**/*.rb'
   # loaded by the gemspec before SimpleCov starts, so it would always show as missed
-  add_filter 'lib/client_api_builder/version.rb'
+  skip 'lib/client_api_builder/version.rb'
 
-  add_group 'Core', 'lib/client_api_builder'
-
-  track_files 'lib/**/*.rb'
+  group 'Core', 'lib/client_api_builder'
 end
 
 begin
