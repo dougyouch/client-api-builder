@@ -192,6 +192,25 @@ describe ClientApiBuilder::Router do
     end
   end
 
+  describe 'symbol keys that are not identifiers' do
+    let(:router_class) do
+      Class.new do
+        include ClientApiBuilder::Router
+
+        base_url 'http://example.com'
+
+        route :create_doc, '/docs', body: { 'content-type': 'json', 'x-id': :doc_id }
+      end
+    end
+
+    it 'sends them as is' do
+      stub = stub_request(:post, 'http://example.com/docs').with(body: '{"content-type":"json","x-id":5}')
+
+      router.create_doc(doc_id: 5)
+      expect(stub).to have_been_requested
+    end
+  end
+
   describe 'literal colons in paths' do
     let(:router_class) do
       Class.new do

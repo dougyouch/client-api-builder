@@ -22,6 +22,7 @@ module ClientApiBuilder
   autoload :ActiveSupportLogSubscriber, 'client_api_builder/active_support_log_subscriber'
   autoload :NestedRouter, 'client_api_builder/nested_router'
   autoload :QueryParams, 'client_api_builder/query_params'
+  autoload :RouteValueValidator, 'client_api_builder/route_value_validator'
   autoload :Router, 'client_api_builder/router'
   autoload :Section, 'client_api_builder/section'
 

@@ -155,8 +155,25 @@ describe ClientApiBuilder::Router do
       expect(router_class.value_to_code({ a: 1, 'b' => 2, 3 => 4 })).to eq('{a: 1, "b" => 2, 3 => 4}')
     end
 
+    it 'renders symbol keys that are not identifiers as quoted symbols' do
+      expect(router_class.value_to_code({ 'content-type': 'json' })).to eq('{:"content-type" => "json"}')
+    end
+
     it 'renders arrays, nil and booleans' do
       expect(router_class.value_to_code([nil, true, false, 'x'])).to eq('[nil, true, false, "x"]')
+    end
+  end
+
+  describe '.route with values that cannot be compiled' do
+    it 'raises before defining any method' do
+      expect { router_class.route :create_event, '/events', body: { at: Time.at(0) } }
+        .to raise_error(ArgumentError, /route :create_event: body value/)
+      expect(router_class.method_defined?(:create_event_raw_response)).to be(false)
+    end
+
+    it 'checks query values too' do
+      expect { router_class.route :get_events, '/events', query: { since: Time.at(0) } }
+        .to raise_error(ArgumentError, /route :get_events: query value/)
     end
   end
 

@@ -317,7 +317,7 @@ module ClientApiBuilder
 
           pairs = value.map do |k, v|
             key_code = case k
-                       when Symbol then "#{k}: "
+                       when Symbol then k.match?(RouteValueValidator::ARGUMENT_NAME) ? "#{k}: " : "#{k.inspect} => "
                        when String then "#{k.inspect} => "
                        else "#{value_to_code(k)} => "
                        end
@@ -412,6 +412,9 @@ module ClientApiBuilder
         unless method_name.to_s.match?(/\A[a-z_][a-z0-9_]*\z/i)
           raise ArgumentError, "Invalid method name: #{method_name.inspect}"
         end
+
+        RouteValueValidator.validate!(method_name, :query, options[:query])
+        RouteValueValidator.validate!(method_name, :body, options[:body])
 
         http_method = options[:method] || auto_detect_http_method(method_name)
         path, path_arguments = process_route_path(path)

@@ -17,6 +17,7 @@ lib/
     ├── section.rb                     # Section module for creating nested routers
     ├── net_http_request.rb            # Net::HTTP request execution and streaming
     ├── query_params.rb                # Custom query parameter builder
+    ├── route_value_validator.rb       # Checks route query/body values can be compiled
     ├── active_support_notifications.rb # ActiveSupport instrumentation
     ├── active_support_log_subscriber.rb # ActiveSupport logging
     └── version.rb                     # Gem version, bumped by release-please
@@ -142,7 +143,11 @@ Provides HTTP request execution using Net::HTTP:
 **Supported HTTP Methods** (via `METHOD_TO_NET_HTTP_CLASS`):
 `copy`, `delete`, `get`, `head`, `lock`, `mkcol`, `move`, `options`, `patch`, `post`, `propfind`, `proppatch`, `put`, `trace`, `unlock`
 
-### 7. QueryParams Class
+### 7. RouteValueValidator Module
+
+`generate_route_code` calls `RouteValueValidator.validate!(route_name, :query/:body, value)` before generating anything. Values are compiled into the generated source, so only `String`, `Integer`, finite `Float`, `true`, `false`, `nil`, argument symbols (valid identifiers) and `Hash`/`Array` of those are allowed; anything else raises `ArgumentError` naming the route, the location and the value's class. Symbol keys that aren't identifiers are written as `:"content-type" =>`.
+
+### 8. QueryParams Class
 
 Standalone query parameter builder (the default `query_builder` when `Hash#to_query` is unavailable, and the `:query_params` builder option):
 
@@ -151,7 +156,7 @@ Standalone query parameter builder (the default `query_builder` when `Hash#to_qu
 - Configurable separators: `name_value_separator` (default `=`), `param_separator` (default `&`)
 - Supports custom escape proc
 
-### 8. ActiveSupport Integration
+### 9. ActiveSupport Integration
 
 **ActiveSupportNotifications** (included when `ActiveSupport` is defined at the time a class includes `Router`):
 - Overrides `instrument_request` to use `ActiveSupport::Notifications.instrument`

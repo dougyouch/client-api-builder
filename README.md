@@ -188,6 +188,8 @@ route :create_report, '/reports', body: { title: 'Report for {username}', limit:
 # q=author:octocat state:open    {"title":"Report for octocat","limit":50}
 ```
 
+`query:` and `body:` are compiled into the generated method when the class loads, so their fixed values must be strings, numbers, booleans, `nil`, hashes or arrays. Other objects (`Time`, `Date`, `BigDecimal`, `Range`, ...) raise an `ArgumentError` naming the route; pass them as an argument or a `'{method}'` placeholder, or write them as a string.
+
 Any `{identifier}` in these strings is a placeholder; other text, including quotes and `#{...}`, is sent literally. Top-level String bodies (`body: '...'`) are always sent as is.
 
 Path values, from arguments and `{name}` alike, are percent-encoded so each stays a single segment: `get_file(name: 'a/b c')` requests `/files/a%2Fb%20c`. Only RFC 3986 unreserved characters (`A-Z a-z 0-9 - . _ ~`) are left as is. To change this, override `escape_path`:

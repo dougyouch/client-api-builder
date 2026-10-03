@@ -56,6 +56,8 @@ script/console
 
 - **NetHTTP::Request** (`lib/client_api_builder/net_http_request.rb`): HTTP request execution using `Net::HTTP`. Handles standard requests and streaming (`:file`, `:io`, `:block` modes).
 
+- **RouteValueValidator** (`lib/client_api_builder/route_value_validator.rb`): Checks a route's `query:`/`body:` values can be compiled into generated source (strings, numbers, booleans, nil, hashes, arrays, argument symbols); raises `ArgumentError` naming the route otherwise.
+
 - **QueryParams** (`lib/client_api_builder/query_params.rb`): Custom query parameter builder used when ActiveSupport's `to_query` is unavailable.
 
 - **ActiveSupportNotifications/LogSubscriber**: Optional instrumentation (`client_api_builder.request` events) and logging. Notifications are included only if `ActiveSupport` is defined when a class includes `Router`.
