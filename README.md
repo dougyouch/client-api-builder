@@ -138,10 +138,10 @@ The Router detects the HTTP method from how the route name starts:
 | `post`, `create`, `add`, `insert` | POST |
 | `put`, `update`, `modify`, `change` | PUT |
 | `patch` | PATCH |
-| `delete`, `remove` | DELETE |
+| `delete`, `remove`, `destroy` | DELETE |
 | anything else | GET |
 
-The match is on the start of the name only, so `address_lookup` is a POST and `destroy_user` is a GET. Pass `method:` when the name doesn't say it.
+The match is on the start of the name only, so `address_lookup` is a POST. Pass `method:` when the name doesn't say it.
 
 ```ruby
 class MyApiClient

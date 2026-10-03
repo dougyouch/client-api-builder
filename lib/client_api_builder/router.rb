@@ -178,7 +178,7 @@ module ClientApiBuilder
           :put
         when /^(?:patch)/i
           :patch
-        when /^(?:delete|remove)/i
+        when /^(?:delete|remove|destroy)/i
           :delete
         else
           :get

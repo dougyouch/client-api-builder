@@ -86,7 +86,7 @@ When `method:` is not specified in route options, `auto_detect_http_method` infe
 | `post`, `create`, `add`, `insert` | POST |
 | `put`, `update`, `modify`, `change` | PUT |
 | `patch` | PATCH |
-| `delete`, `remove` | DELETE |
+| `delete`, `remove`, `destroy` | DELETE |
 | (default) | GET |
 
 The patterns match the start of the name with no word boundary, so `address_lookup` is a POST.
