@@ -484,6 +484,8 @@ puts client.total_request_time   # Time in seconds
 puts client.request_attempts     # Number of attempts (including retries)
 ```
 
+These describe the latest attempt. If it failed, `response` is `nil` when no response arrived, and `request_options` is `nil` when the request couldn't be built.
+
 ### ActiveSupport Integration
 
 When ActiveSupport is loaded before your client class includes `ClientApiBuilder::Router`, every request is instrumented as a `client_api_builder.request` event:

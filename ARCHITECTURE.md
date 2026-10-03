@@ -46,7 +46,7 @@ The `Router` module is the core component that provides the main functionality f
 - `build_body`: Formats request body using configured builder
 - `build_uri`: Constructs full URI with base_url, path, and query
 - `handle_response`: Processes API responses, parses JSON by default
-- `request_wrapper`: Manages request execution with retry and instrumentation
+- `request_wrapper`: Manages request execution with retry and instrumentation; clears `@request_options` and `@response` before each attempt
 - `expected_response_code!`: Raises `UnexpectedResponse` unless the code is expected (any 2xx when none are configured)
 - `parse_response`: Parses JSON bodies, returning `nil` for empty ones
 - `retry_request?`: Decides whether an exception is retried (network errors only by default)
@@ -157,7 +157,7 @@ Standalone query parameter builder (the default `query_builder` when `Hash#to_qu
 
 **ActiveSupportLogSubscriber**:
 - Subscribes to `client_api_builder.request` events for logging
-- Logs `METHOD scheme://host/path[code] took Nms`, leaving out the query string
+- Logs `METHOD scheme://host/path[code] took Nms`, leaving out the query string; `[UNKNOWN]` when no response arrived and `[request not built]` when the request failed before it was built
 
 Without ActiveSupport, `Router#instrument_request` only records `total_request_time`.
 

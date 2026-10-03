@@ -112,6 +112,37 @@ describe ClientApiBuilder::Router do
     end
   end
 
+  describe 'state after a failed attempt' do
+    it 'clears the previous response when a request times out' do
+      stub_request(:get, 'http://example.com/items')
+      stub_request(:get, 'http://example.com/text').to_timeout
+      router.get_items
+
+      expect { router.get_text }.to raise_error(Net::OpenTimeout)
+      expect(router.response).to be_nil
+      expect(router.request_options[:uri].path).to eq('/text')
+    end
+
+    it 'clears the request options when the request cannot be built' do
+      stub_request(:get, 'http://example.com/items')
+      router.get_items
+      router_class.body_builder { |_| raise ArgumentError, 'bad body' }
+
+      expect { router.search(body: { q: 1 }) }.to raise_error(ArgumentError, 'bad body')
+      expect(router.request_options).to be_nil
+      expect(router.response).to be_nil
+    end
+
+    it 'does not keep a response from an earlier attempt of the same call' do
+      stub_request(:get, 'http://example.com/items').to_return(status: 503).then.to_timeout
+      router.define_singleton_method(:retry_request?) { |_exception, _options| true }
+
+      expect { router.get_items(retries: 2) }.to raise_error(Net::OpenTimeout)
+      expect(router.request_attempts).to eq(2)
+      expect(router.response).to be_nil
+    end
+  end
+
   describe 'routes sharing a query hash' do
     let(:router_class) do
       shared = { app_id: :app_id }.freeze

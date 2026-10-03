@@ -589,6 +589,9 @@ module ClientApiBuilder
 
     def request_wrapper(options, &block)
       retry_request(options) do
+        # Clear the previous attempt's state so a failed attempt never reports an earlier response
+        @request_options = nil
+        @response = nil
         instrument_request(&block)
       end
     end

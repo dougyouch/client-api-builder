@@ -17,14 +17,24 @@ module ClientApiBuilder
       end
     end
 
+    # request_options is nil when the request failed before it was built,
+    # and response is nil when no response was received.
     def generate_log_message(event)
       client = event.payload[:client]
-      method = client.request_options[:method].to_s.upcase
-      uri = client.request_options[:uri]
-      response = client.response
-      response_code = response ? response.code : 'UNKNOWN'
+      request_options = client.request_options
+      response_code = client.response ? client.response.code : 'UNKNOWN'
 
-      "#{method} #{uri.scheme}://#{uri.host}#{uri.path}[#{response_code}] took #{event.duration.to_i}ms"
+      "#{request_description(request_options)}[#{response_code}] took #{event.duration.to_i}ms"
+    end
+
+    private
+
+    def request_description(request_options)
+      return '[request not built]' unless request_options
+
+      method = request_options[:method].to_s.upcase
+      uri = request_options[:uri]
+      uri ? "#{method} #{uri.scheme}://#{uri.host}#{uri.path}" : "#{method} [no URI]"
     end
   end
 end

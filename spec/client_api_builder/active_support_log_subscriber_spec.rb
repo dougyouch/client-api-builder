@@ -92,6 +92,22 @@ describe ClientApiBuilder::ActiveSupportLogSubscriber do
       end
     end
 
+    context 'when the request was not built' do
+      let(:mock_client) { instance_double(client_class, request_options: nil, response: nil) }
+
+      it 'says so instead of failing' do
+        expect(subscriber.generate_log_message(event)).to eq('[request not built][UNKNOWN] took 150ms')
+      end
+    end
+
+    context 'when the request has no URI' do
+      let(:mock_client) { instance_double(client_class, request_options: { method: :get }, response: nil) }
+
+      it 'says so instead of failing' do
+        expect(subscriber.generate_log_message(event)).to eq('GET [no URI][UNKNOWN] took 150ms')
+      end
+    end
+
     context 'with different HTTP methods' do
       %i[get post put patch delete].each do |http_method|
         it "handles #{http_method.upcase} method" do
@@ -106,6 +122,32 @@ describe ClientApiBuilder::ActiveSupportLogSubscriber do
           expect(message).to include(http_method.to_s.upcase)
         end
       end
+    end
+  end
+
+  describe 'logging a failed request' do
+    let(:router_class) do
+      Class.new do
+        include ClientApiBuilder::Router
+
+        base_url 'http://example.com'
+
+        route :get_ok, '/ok'
+        route :get_slow, '/slow'
+      end
+    end
+
+    after { ActiveSupport::Notifications.unsubscribe('client_api_builder.request') }
+
+    it 'does not report the previous response for a timed-out request' do
+      stub_request(:get, 'http://example.com/ok')
+      stub_request(:get, 'http://example.com/slow').to_timeout
+      router = router_class.new
+      router.get_ok
+      subscriber.subscribe!
+
+      expect { router.get_slow }.to raise_error(Net::OpenTimeout)
+      expect(log_output.string).to include('GET http://example.com/slow[UNKNOWN]')
     end
   end
 end
