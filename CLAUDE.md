@@ -50,7 +50,7 @@ script/console
 
 - **Router** (`lib/client_api_builder/router.rb`): Main module. Its `ClassMethods` provide the DSL (`base_url`, `header`, `query_param`, `connection_option`, `body_builder`, `query_builder`, `configure_retries`, `namespace`, `route`) and the code generator; the request/response instance methods are defined on `Router` itself. Uses `InheritanceHelper::Methods` for configuration inheritance.
 
-- **NestedRouter** (`lib/client_api_builder/nested_router.rb`): Base class for sections. Holds a `root_router` reference: it falls back to the root's `base_url`, delegates `handle_response` to it, and resolves `{name}` path values on it. It does **not** inherit the root's headers, query params, connection options or retry settings.
+- **NestedRouter** (`lib/client_api_builder/nested_router.rb`): Base class for sections. Holds a `root_router` reference: it falls back to the root's `base_url`, delegates `handle_response` to it, and resolves `{name}` path values on it. By default it does **not** inherit the root's headers, query params, connection options or retry settings; `section :x, inherit: [...]` / `inherit_from_root` opts into the root's headers, query params and/or connection options (merged beneath the section's own via the `configured_*` methods).
 
 - **Section** (`lib/client_api_builder/section.rb`): Provides `section` class method for creating nested route groups via dynamically generated classes. `<name>_router` and `<name>` are defined with closures (not generated source), so sections work on anonymous classes.
 

@@ -12,17 +12,23 @@ module ClientApiBuilder
 
       # Defines <name>_router (the section's NestedRouter class) and <name> (its router for a
       # client instance) with closures, so anonymous client classes and any option values work.
-      def section(name, nested_router_options = {}, &)
+      # inherit: opts the section into root client settings (see NestedRouter.inherit_from_root);
+      # the remaining options are passed to the section as nested_router_options.
+      def section(name, nested_router_options = {}, &block)
         raise ArgumentError, "Invalid section name: #{name.inspect}" unless name.to_s.match?(SECTION_NAME)
+
+        nested_router_options = nested_router_options.dup
+        inherit = ::ClientApiBuilder::NestedRouter.normalize_inherited_settings(Array(nested_router_options.delete(:inherit)))
 
         kls = InheritanceHelper::ClassBuilder::Utils.create_class(
           self,
           name,
           ::ClientApiBuilder::NestedRouter,
           nil,
-          'NestedRouter',
-          &
+          'NestedRouter'
         )
+        kls.inherit_from_root(inherit)
+        kls.class_eval(&block) if block
 
         define_singleton_method(:"#{name}_router") { kls }
         define_section_accessor(name, nested_router_options)

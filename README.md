@@ -296,9 +296,9 @@ class MyApiClient
     "Bearer #{auth_token}"
   end
 
-  section :users do
+  # Use the root client's headers (Authorization) beneath the section's own
+  section :users, inherit: :headers do
     base_url 'https://api.example.com/v2'  # Override base URL
-    header 'Authorization', :authorization
 
     route :list, '/users'
     route :get, '/users/:id'
@@ -306,7 +306,7 @@ class MyApiClient
   end
 
   section :posts do
-    header 'Authorization', :authorization
+    header 'Authorization', :authorization  # or declare what it needs itself
 
     route :list, '/posts'
     route :get, '/posts/:id'
@@ -322,7 +322,17 @@ user = client.users.get(id: 123)
 posts = client.posts.list
 ```
 
-A section is its own router class. It uses the parent's `base_url` unless it sets one, but headers, query params, connection options, retries and builders are not inherited, so declare the ones it needs inside the section. Symbol and block values given to `header` and `query_param`, `{name}` path values, and response blocks are evaluated on the root client, so they can use its methods and state.
+A section is its own router class. It uses the parent's `base_url` unless it sets one, but by default nothing else is inherited: declare the headers, query params and connection options it needs inside the section, or opt into the root client's with `inherit:`:
+
+```ruby
+section :users, inherit: %i[headers query_params connection_options] do
+  # or, inside the block: inherit_from_root :headers
+end
+```
+
+Inherited settings are the root client's class-level ones, read on every request (so ones declared after the section, or in a subclass of the client, apply too). The section's own settings override them, and per-request options override both; a per-request `nil` header still drops an inherited one. Retries and body/query builders are always the section's own. Any other options passed to `section` are available to it as `nested_router_options`.
+
+Symbol and block values given to `header` and `query_param`, `{name}` path values, and response blocks are evaluated on the root client, so they can use its methods and state.
 
 ### Connection Options
 
@@ -643,7 +653,7 @@ end
 | `connection_option(name, value)` | Set Net::HTTP connection options |
 | `configure_retries(max_attempts, sleep = 0.05)` | Configure retry behavior |
 | `route(name, path, options)` | Define an API endpoint |
-| `section(name, options, &block)` | Define nested routes |
+| `section(name, options, &block)` | Define nested routes; `inherit:` opts into the root client's `:headers`, `:query_params` and/or `:connection_options` |
 | `namespace(path, &block)` | Add path prefix to routes in block |
 
 ### Instance Methods

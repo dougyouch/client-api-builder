@@ -43,6 +43,7 @@ The `Router` module is the core component that provides the main functionality f
 **Instance Methods**:
 - `build_headers`: Constructs request headers: class-level symbols/procs are resolved (`resolve_config_value`), per-request headers are merged as given, values become strings and `nil` drops a header
 - `build_connection_options`: Merges default and request-specific options
+- `configured_headers` / `configured_query_params` / `configured_connection_options`: The class-level settings (symbols and procs resolved) that the `build_*` methods start from; `NestedRouter` extends them for `inherit:`
 - `build_query`: Resolves class-level `query_param` symbols/procs, merges route and per-request values as given, and formats them with the configured builder
 - `build_body`: Formats request body using configured builder
 - `build_uri`: Constructs full URI with base_url, path, and query; `validated_base_url` checks the effective base URL (set, http/https, has a host) on every request, so `base_url` method overrides are validated too
@@ -113,8 +114,9 @@ Key behaviors:
 - Delegates `handle_response` to root_router, so response blocks run on the root client
 - Overrides `get_instance_method` so `{name}` path values call `root_router.name` (still passed through `escape_path`)
 - Class-level header and query param symbols and procs are evaluated on root_router (as on any router)
-- Has its own `default_options`: headers, query params, connection options, retries and builders are not inherited from the root router
-- `nested_router_options` are stored but not read by the library
+- Has its own `default_options`: headers, query params, connection options, retries and builders are not inherited from the root router by default
+- `inherit_from_root(*settings)` (or `section ..., inherit:`) opts into the root's `:headers`, `:query_params` and/or `:connection_options`. `NestedRouter` overrides `configured_headers` / `configured_query_params` / `configured_connection_options` to merge the root's (read per request, resolved on the root) beneath its own; the list is stored in `inherited_root_settings`
+- `nested_router_options` holds the options passed to `section` (minus `inherit:`); the library doesn't read them
 
 ### 5. Section Module (`ClientApiBuilder::Section`)
 

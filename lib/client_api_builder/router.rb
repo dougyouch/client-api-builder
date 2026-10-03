@@ -484,27 +484,39 @@ module ClientApiBuilder
     # Class-level headers may be method names or blocks; per-request headers are used as given.
     # Values are converted to strings, as Net::HTTP requires; nil values are left out of the request.
     def build_headers(options)
-      headers = self.class.default_headers.transform_values { |value| resolve_config_value(value) }
+      headers = configured_headers
       headers.merge!(options[:headers]) if options[:headers]
       headers.transform_values { |value| value&.to_s }
     end
 
+    # Class-level headers with symbols and blocks resolved; sections may add the root client's
+    def configured_headers
+      self.class.default_headers.transform_values { |value| resolve_config_value(value) }
+    end
+
     def build_connection_options(options)
-      if options[:connection_options]
-        self.class.default_connection_options.merge(options[:connection_options])
-      else
-        self.class.default_connection_options
-      end
+      connection_options = configured_connection_options
+      options[:connection_options] ? connection_options.merge(options[:connection_options]) : connection_options
+    end
+
+    # Class-level connection options; sections may add the root client's
+    def configured_connection_options
+      self.class.default_connection_options
     end
 
     # Class-level query params may be method names or blocks; values from route arguments
     # and per-request options are sent as given.
     def build_query(query, options)
-      query_params = self.class.default_query_params.transform_values { |value| resolve_config_value(value) }
+      query_params = configured_query_params
       query_params.merge!(query) if query
       query_params.merge!(options[:query]) if options[:query]
 
       query_params.empty? ? nil : self.class.build_query(self, query_params)
+    end
+
+    # Class-level query params with symbols and blocks resolved; sections may add the root client's
+    def configured_query_params
+      self.class.default_query_params.transform_values { |value| resolve_config_value(value) }
     end
 
     # Resolves a class-level header or query_param value: a Symbol calls that method and a
