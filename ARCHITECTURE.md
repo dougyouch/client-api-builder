@@ -154,11 +154,11 @@ Standalone query parameter builder (the default `query_builder` when `Hash#to_qu
 **ActiveSupportNotifications** (included when `ActiveSupport` is defined at the time a class includes `Router`):
 - Overrides `instrument_request` to use `ActiveSupport::Notifications.instrument`
 - Event name: `client_api_builder.request`
-- Payload includes `client: self`
+- Payload includes `client: self`; when the attempt raises, ActiveSupport adds `:exception` and `:exception_object` and re-raises the original exception
 
 **ActiveSupportLogSubscriber**:
 - Subscribes to `client_api_builder.request` events for logging
-- Logs `METHOD scheme://host/path[code] took Nms`, leaving out the query string; `[UNKNOWN]` when no response arrived and `[request not built]` when the request failed before it was built
+- Logs `METHOD scheme://host/path[code] took Nms`, leaving out the query string; `[UNKNOWN]` when no response arrived, `[request not built]` when the request failed before it was built, and a trailing `(ExceptionClass: message)` when the attempt raised
 
 Without ActiveSupport, `Router#instrument_request` only records `total_request_time`.
 

@@ -19,12 +19,15 @@ module ClientApiBuilder
 
     # request_options is nil when the request failed before it was built,
     # and response is nil when no response was received.
+    # Failed requests end with the exception, e.g. "(Net::OpenTimeout: execution expired)".
     def generate_log_message(event)
       client = event.payload[:client]
       request_options = client.request_options
       response_code = client.response ? client.response.code : 'UNKNOWN'
 
-      "#{request_description(request_options)}[#{response_code}] took #{event.duration.to_i}ms"
+      message = "#{request_description(request_options)}[#{response_code}] took #{event.duration.to_i}ms"
+      exception = event.payload[:exception]
+      exception ? "#{message} (#{exception.join(': ')})" : message
     end
 
     private

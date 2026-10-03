@@ -35,25 +35,31 @@ describe ClientApiBuilder::ActiveSupportNotifications do
 
       expect(events.length).to eq(1)
       expect(events.first.payload[:client]).to eq(instance)
+      expect(events.first.payload).not_to have_key(:exception)
 
       ActiveSupport::Notifications.unsubscribe(subscription)
     end
 
     context 'when block raises StandardError' do
-      it 're-raises the error with original backtrace' do
+      it 're-raises the original exception object with its backtrace' do
         original_error = StandardError.new('test error')
         original_error.set_backtrace(%w[line1 line2])
 
-        raised_error = nil
-        begin
-          instance.instrument_request { raise original_error }
-        rescue StandardError => e
-          raised_error = e
+        expect { instance.instrument_request { raise original_error } }.to raise_error do |raised|
+          expect(raised).to be(original_error)
+          expect(raised.backtrace).to eq(%w[line1 line2])
         end
+      end
 
-        expect(raised_error).to be_a(StandardError)
-        expect(raised_error.message).to eq('test error')
-        expect(raised_error.backtrace).to include('line1', 'line2')
+      it 'adds the exception to the event payload' do
+        payload = nil
+        subscription = ActiveSupport::Notifications.subscribe('client_api_builder.request') { |*, data| payload = data }
+        error = ArgumentError.new('bad request')
+
+        expect { instance.instrument_request { raise error } }.to raise_error(error)
+        expect(payload).to include(exception: ['ArgumentError', 'bad request'], exception_object: error)
+      ensure
+        ActiveSupport::Notifications.unsubscribe(subscription)
       end
 
       it 'still sets total_request_time' do

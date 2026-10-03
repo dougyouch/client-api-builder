@@ -504,14 +504,22 @@ ActiveSupport::Notifications.subscribe('client_api_builder.request') do |*args|
   event = ActiveSupport::Notifications::Event.new(*args)
   client = event.payload[:client]
 
-  puts "#{client.request_options[:method]} #{client.request_options[:uri]}"
+  puts "#{client.request_options&.dig(:method)} #{client.request_options&.dig(:uri)}"
   puts "Status: #{client.response&.code}"
   puts "Duration: #{event.duration.round(2)}ms"
+  puts "Failed: #{event.payload[:exception_object].inspect}" if event.payload[:exception]
 end
 
 # Or use the built-in log subscriber
 subscriber = ClientApiBuilder::ActiveSupportLogSubscriber.new(Rails.logger)
 subscriber.subscribe!
+```
+
+An event fires for every attempt, including failed ones. When an attempt raises, the payload also holds `:exception` (`[class name, message]`) and `:exception_object`, following the usual ActiveSupport convention, and `request_options` or `response` may be `nil`. The built-in subscriber logs lines like:
+
+```
+GET https://api.example.com/users/123[200] took 45ms
+GET https://api.example.com/users/123[UNKNOWN] took 5003ms (Net::ReadTimeout: Net::ReadTimeout)
 ```
 
 Separately, `ClientApiBuilder.logger` receives every exception raised during a request attempt, including ones that are retried:

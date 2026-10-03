@@ -92,6 +92,22 @@ describe ClientApiBuilder::ActiveSupportLogSubscriber do
       end
     end
 
+    context 'when the request raised' do
+      let(:mock_client) { instance_double(client_class, request_options: { method: :get, uri: uri }, response: nil) }
+      let(:event) do
+        instance_double(
+          ActiveSupport::Notifications::Event,
+          payload: { client: mock_client, exception: ['Net::ReadTimeout', 'Net::ReadTimeout'] },
+          duration: 150.5
+        )
+      end
+
+      it 'appends the exception' do
+        expect(subscriber.generate_log_message(event))
+          .to eq('GET https://api.example.com/v1/users[UNKNOWN] took 150ms (Net::ReadTimeout: Net::ReadTimeout)')
+      end
+    end
+
     context 'when the request was not built' do
       let(:mock_client) { instance_double(client_class, request_options: nil, response: nil) }
 
@@ -147,7 +163,7 @@ describe ClientApiBuilder::ActiveSupportLogSubscriber do
       subscriber.subscribe!
 
       expect { router.get_slow }.to raise_error(Net::OpenTimeout)
-      expect(log_output.string).to include('GET http://example.com/slow[UNKNOWN]')
+      expect(log_output.string).to match(%r{GET http://example.com/slow\[UNKNOWN\] took \d+ms \(Net::OpenTimeout: execution expired\)})
     end
   end
 end
