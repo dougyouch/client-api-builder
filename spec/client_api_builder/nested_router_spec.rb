@@ -154,6 +154,13 @@ describe ClientApiBuilder::NestedRouter do
       it 'resolves them on the root router' do
         expect(subject).to eq('name' => 'me')
       end
+
+      it 'URL-encodes them' do
+        router.auth_token = 'a/b c'
+        stub_request(:get, 'http://login.example.com/profiles/a%2Fb%20c?cachebuster=5')
+        router.login.get_profile
+        expect(router.login.request_options[:uri].path).to eq('/profiles/a%2Fb%20c')
+      end
     end
 
     describe 'block override' do

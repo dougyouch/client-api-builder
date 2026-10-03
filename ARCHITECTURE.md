@@ -50,7 +50,7 @@ The `Router` module is the core component that provides the main functionality f
 - `expected_response_code!`: Raises `UnexpectedResponse` unless the code is expected (any 2xx when none are configured)
 - `parse_response`: Parses JSON bodies, returning `nil` for empty ones
 - `retry_request?`: Decides whether an exception is retried (network errors only by default)
-- `escape_path`: Hook for encoding path values; returns them unchanged by default
+- `escape_path`: Percent-encodes path values (`ERB::Util.url_encode`) so each stays one segment; override to change
 - `root_router`: Returns self (overridden in NestedRouter)
 
 **Instance Attributes** (via `attr_reader`):
@@ -109,7 +109,7 @@ Key behaviors:
 - Stores `nested_router_options` passed from section definition
 - Overrides `base_url` to fall back to root_router's base_url
 - Delegates `handle_response` to root_router, so response blocks run on the root client
-- Overrides `get_instance_method` so `{name}` path values call `root_router.name`
+- Overrides `get_instance_method` so `{name}` path values call `root_router.name` (still passed through `escape_path`)
 - Header and query param symbols and procs are evaluated on root_router (as on any router)
 - Has its own `default_options`: headers, query params, connection options, retries and builders are not inherited from the root router
 - `nested_router_options` are stored but not read by the library

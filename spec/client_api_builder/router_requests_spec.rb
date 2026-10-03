@@ -24,6 +24,7 @@ describe ClientApiBuilder::Router do
       route :download, '/file', stream: :file
       route :download_io, '/file', stream: :io
       route :download_chunks, '/file', stream: :block
+      route :get_file, '/folders/{folder}/files/:name'
 
       def second
         'two'
@@ -31,6 +32,10 @@ describe ClientApiBuilder::Router do
 
       def label
         'lbl'
+      end
+
+      def folder
+        'my docs'
       end
     end
   end
@@ -79,6 +84,31 @@ describe ClientApiBuilder::Router do
 
       router.create_raw(body: { a: 1 })
       expect(stub).to have_been_requested
+    end
+  end
+
+  describe 'path values' do
+    before { stub_request(:get, %r{http://example.com/folders/}) }
+
+    it 'URL-encodes arguments and instance values so each stays one segment' do
+      router.get_file(name: '../a/b?c#d*é')
+      expect(router.request_options[:uri].path).to eq('/folders/my%20docs/files/..%2Fa%2Fb%3Fc%23d%2A%C3%A9')
+    end
+
+    it 'leaves unreserved characters as is' do
+      router.get_file(name: 'Report-2024_v1.~pdf')
+      expect(router.request_options[:uri].path).to eq('/folders/my%20docs/files/Report-2024_v1.~pdf')
+    end
+
+    it 'accepts non-string values' do
+      router.get_file(name: 42)
+      expect(router.request_options[:uri].path).to eq('/folders/my%20docs/files/42')
+    end
+
+    it 'uses an overridden escape_path' do
+      router.define_singleton_method(:escape_path) { |value| value.to_s.tr(' ', '-') }
+      router.get_file(name: 'a/b')
+      expect(router.request_options[:uri].path).to eq('/folders/my-docs/files/a/b')
     end
   end
 

@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require 'erb'
 require 'inheritance-helper'
 require 'json'
 
@@ -552,8 +553,11 @@ module ClientApiBuilder
       self
     end
 
+    # Percent-encodes everything but RFC 3986 unreserved characters (A-Z a-z 0-9 - . _ ~),
+    # so a value inserted into the path, including any '/', stays one segment.
+    # Override to change how path values are encoded.
     def escape_path(path)
-      path
+      ERB::Util.url_encode(path.to_s)
     end
 
     def instrument_request

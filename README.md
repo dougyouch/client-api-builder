@@ -180,11 +180,12 @@ route :get_invoices, '/accounts/{account_id}/invoices'
 
 The same `'{name}'` form works as a value inside `query:` and `body:`.
 
-Path values are inserted as given. To URL-encode them, override `escape_path`:
+Path values, from arguments and `{name}` alike, are percent-encoded so each stays a single segment: `get_file(name: 'a/b c')` requests `/files/a%2Fb%20c`. Only RFC 3986 unreserved characters (`A-Z a-z 0-9 - . _ ~`) are left as is. To change this, override `escape_path`:
 
 ```ruby
+# Allow '/' in values, e.g. for nested object keys
 def escape_path(value)
-  ERB::Util.url_encode(value.to_s)
+  value.to_s.split('/').map { |part| ERB::Util.url_encode(part) }.join('/')
 end
 ```
 
@@ -552,6 +553,10 @@ class MyApiClient
 end
 ```
 
+### Path Value Encoding
+
+Values inserted into a route's path are percent-encoded, so input such as `../admin` or `a/b?x=1` can't add path segments or a query string to the request.
+
 ### Path Traversal Protection
 
 File streaming rejects any path containing `..` or a null byte:
@@ -624,7 +629,7 @@ Define these in your client to change default behavior:
 | Method | Default |
 |--------|---------|
 | `retry_request?(exception, options)` | `true` for the network errors listed under Retry Configuration |
-| `escape_path(value)` | Returns the value unchanged |
+| `escape_path(value)` | Percent-encodes path values (`ERB::Util.url_encode`) |
 | `parse_response(response, options)` | Parses the body as JSON, `nil` when empty |
 | `handle_response(response, options, &block)` | Applies `return:`, parsing and the response block |
 | `expected_response_code!(response, codes, options)` | Raises `UnexpectedResponse` for unexpected codes |

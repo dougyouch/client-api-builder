@@ -17,7 +17,7 @@ module ClientApiBuilder
     end
 
     def self.get_instance_method(var)
-      "\#{root_router.#{var}}"
+      "\#{escape_path(root_router.#{var})}"
     end
 
     def base_url
