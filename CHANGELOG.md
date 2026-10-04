@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.11.0](https://github.com/dougyouch/client-api-builder/compare/v0.10.0...v0.11.0) (2026-10-04)
+
+
+### Features
+
+* **thread_connections:** add per-thread persistent connections ([3ad347d](https://github.com/dougyouch/client-api-builder/commit/3ad347d7a022b60dfb9e0d36de5260dd37f456be))
+* **thread_connections:** add per-thread persistent connections ([4f61cd9](https://github.com/dougyouch/client-api-builder/commit/4f61cd94731ac81c0993bfbee8acf6c9c4328ce2))
+
 ## [0.10.0](https://github.com/dougyouch/client-api-builder/compare/v0.9.0...v0.10.0) (2026-10-04)
 
 
