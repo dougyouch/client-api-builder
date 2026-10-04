@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.9.0](https://github.com/dougyouch/client-api-builder/compare/v0.8.0...v0.9.0) (2026-10-04)
+
+
+### Features
+
+* add connection pools and exponential retry backoff ([e076162](https://github.com/dougyouch/client-api-builder/commit/e076162539aa9e92c1ec9bbdb5033de4cc163a14))
+* **connection-pools:** add opt-in persistent connection pools ([d172764](https://github.com/dougyouch/client-api-builder/commit/d17276410b007d15d577693677bd17f0a4be0a27))
+* **connection-pools:** add opt-in persistent connection pools ([df6fe98](https://github.com/dougyouch/client-api-builder/commit/df6fe9807ae9b0afb6b8f239ced15b6d5f984eea))
+* **connection-pools:** let sections configure their own connection pools ([b0e17e3](https://github.com/dougyouch/client-api-builder/commit/b0e17e34efaeaa731f854e2e58348c5ae87c7cfa))
+* **router:** add exponential backoff and jitter to retries ([59daf51](https://github.com/dougyouch/client-api-builder/commit/59daf51757f0b26d19064493cc499fc2cbef8954))
+
 ## [0.8.0](https://github.com/dougyouch/client-api-builder/compare/v0.7.2...v0.8.0) (2026-10-03)
 
 
