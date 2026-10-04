@@ -1,9 +1,9 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
-# Compares HTTP/1.1 (a new connection per request, and ConnectionPools) with HTTP/2 against a
-# local TLS server running in a forked process, so the server's CPU and GVL don't count against
-# the client. Each scenario runs its requests across N threads, one client instance per thread.
+# Compares HTTP/1.1 (a new connection per request, ConnectionPools and ThreadConnections) with
+# HTTP/2 against a local TLS server running in a forked process, so the server's CPU and GVL don't
+# count against the client. Each scenario runs its requests across N threads, one client instance per thread.
 #
 #   bundle exec ruby script/benchmark_http2.rb
 #   bundle exec ruby script/benchmark_http2.rb --requests 2000 --threads 1,10,50 --delay 20 --size 50000
@@ -155,6 +155,7 @@ module Benchmarks
       Class.new do
         include ClientApiBuilder::Router
         include ClientApiBuilder::ConnectionPools if transport == :pooled
+        include ClientApiBuilder::ThreadConnections if transport == :per_thread
         include ClientApiBuilder::HTTP2 if transport == :http2
 
         base_url url
@@ -217,7 +218,8 @@ module Benchmarks
 
   # Parses the options, runs every scenario against one server, and prints a table
   class Runner
-    TRANSPORTS = { new_connection: 'HTTP/1.1 new conn', pooled: 'HTTP/1.1 pooled', http2: 'HTTP/2' }.freeze
+    TRANSPORTS = { new_connection: 'HTTP/1.1 new conn', pooled: 'HTTP/1.1 pooled', per_thread: 'HTTP/1.1 per-thread',
+                   http2: 'HTTP/2' }.freeze
     WIDTHS = [8, 11, 10, 10, 13].freeze
 
     def initialize(argv)
@@ -274,7 +276,7 @@ module Benchmarks
     end
 
     def print_row(label, values)
-      puts "#{label.ljust(18)}#{values.zip(WIDTHS).map { |value, width| value.rjust(width) }.join}"
+      puts "#{label.ljust(21)}#{values.zip(WIDTHS).map { |value, width| value.rjust(width) }.join}"
     end
   end
 end

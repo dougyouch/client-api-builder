@@ -2,7 +2,7 @@
 
 # Purpose: opt-in HTTP/2 for https requests, using the http-2 gem (add gem 'http-2' to your
 # Gemfile; it isn't a runtime dependency). Include after ClientApiBuilder::Router, and after
-# ClientApiBuilder::ConnectionPools when using both:
+# ClientApiBuilder::ConnectionPools or ClientApiBuilder::ThreadConnections when using either:
 #
 #   class MyClient
 #     include ClientApiBuilder::Router
@@ -13,8 +13,9 @@
 #
 # Every instance of the class shares one connection per origin, carrying concurrent requests
 # as streams. TLS negotiates the protocol (ALPN): when the server picks HTTP/1.1, the origin is
-# remembered and its requests go through Net::HTTP (or the connection pools) instead. http
-# URLs always use HTTP/1.1. Responses are Net::HTTPResponse objects with http_version '2.0'.
+# remembered and its requests go through Net::HTTP (or the pooled or per-thread connections)
+# instead. http URLs always use HTTP/1.1. Responses are Net::HTTPResponse objects with
+# http_version '2.0'.
 module ClientApiBuilder
   module HTTP2
     autoload :Connection, 'client_api_builder/http2/connection'
@@ -54,7 +55,8 @@ module ClientApiBuilder
     end
 
     module ClassMethods
-      # Closes this class's HTTP/2 connections, and its connection pools when it has them
+      # Closes this class's HTTP/2 connections, and its pooled or per-thread connections when it
+      # has them
       def close_connections
         http2_connections.close
         super if defined?(super)

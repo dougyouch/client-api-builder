@@ -31,6 +31,7 @@ module ClientApiBuilder
   autoload :RouteValueValidator, 'client_api_builder/route_value_validator'
   autoload :Router, 'client_api_builder/router'
   autoload :Section, 'client_api_builder/section'
+  autoload :ThreadConnections, 'client_api_builder/thread_connections'
 
   module NetHTTP
     autoload :Request, 'client_api_builder/net_http_request'

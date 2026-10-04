@@ -53,8 +53,16 @@ module ClientApiBuilder
       connection_pool(**settings)
     end
 
-    # Closes the pools of any nested sections that have their own; a section with its own
-    # pools uses ConnectionPools.close_connections, which closes those as well
+    # Gives this section its own per-thread connections (see
+    # ThreadConnections.connection_per_thread), the same way connection_pool does
+    def self.connection_per_thread(**settings)
+      include ::ClientApiBuilder::ThreadConnections
+
+      connection_per_thread(**settings)
+    end
+
+    # Closes the connections of any nested sections that have their own; a section with its
+    # own uses ConnectionPools or ThreadConnections.close_connections, which close those as well
     def self.close_connections
       section_routers.each_value(&:close_connections)
     end
@@ -79,7 +87,8 @@ module ClientApiBuilder
       root_router.handle_response(response, options, &)
     end
 
-    # Uses the root client's connections unless this section calls connection_pool
+    # Uses the root client's connections unless this section calls connection_pool or
+    # connection_per_thread
     def with_http_connection(uri, connection_options, &)
       root_router.with_http_connection(uri, connection_options, &)
     end
