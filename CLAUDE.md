@@ -48,7 +48,7 @@ script/console
 
 ### Core Components
 
-- **Router** (`lib/client_api_builder/router.rb`): Main module. Its `ClassMethods` provide the DSL (`base_url`, `header`, `query_param`, `connection_option`, `body_builder`, `query_builder`, `configure_retries`, `namespace`, `route`) and the code generator; the request/response instance methods are defined on `Router` itself. Uses `InheritanceHelper::Methods` for configuration inheritance.
+- **Router** (`lib/client_api_builder/router.rb`): Main module. Its `ClassMethods` provide the DSL (`base_url`, `header`, `query_param`, `connection_option`, `body_builder`, `query_builder`, `configure_retries`, `configure_exponential_retries`, `namespace`, `route`) and the code generator; the request/response instance methods are defined on `Router` itself. Uses `InheritanceHelper::Methods` for configuration inheritance.
 
 - **NestedRouter** (`lib/client_api_builder/nested_router.rb`): Base class for sections. Holds a `root_router` reference: it falls back to the root's `base_url`, delegates `handle_response` to it, and resolves `{name}` path values on it. By default it does **not** inherit the root's headers, query params, connection options or retry settings; `section :x, inherit: [...]` / `inherit_from_root` opts into the root's headers, query params and/or connection options (merged beneath the section's own via the `configured_*` methods).
 
@@ -83,7 +83,7 @@ Methods are auto-detected from the start of route names: `post/create/add/insert
 - Without `expected_response_code(s)`, any 2xx is accepted; with them, only the listed codes.
 - `response`/`request_options` are cleared at the start of each attempt, so after a failure they are `nil` rather than the previous call's.
 - Streaming routes validate the status (via `validate_response:` → `expected_response_code!`) before streaming; error bodies go to `response.body`, never the file/IO/block.
-- `configure_retries(n)` sets total attempts (default 1, so no retries). Only network errors are retried (`retry_request?`).
+- `configure_retries(n)` sets total attempts (default 1, so no retries). Only network errors are retried (`retry_request?`). The sleep before retry n is `sleep * backoff**(n - 1)` capped at `max_sleep`, then randomly shortened by `jitter:` (`true` = full, 0..1 = up to that fraction); `configure_exponential_retries attempts:, initial:, max:` is shorthand for that.
 - Symbols/procs are resolved (on `root_router`) only for class-level `header`/`query_param` values. Route arguments and per-request `headers:`/`query:` are data and are sent as given.
 - `escape_path` percent-encodes every path value (arguments and `{name}`), including `/`, so each stays one segment.
 - HTTPS gets `VERIFY_PEER` and 30s/60s timeouts by default; user connection options override them.
@@ -93,7 +93,7 @@ Methods are auto-detected from the start of route names: `post/create/add/insert
 1. `default_options` class method (base defaults)
 2. Class-level configuration via DSL methods (inherited by subclasses)
 3. Instance method overrides (e.g. `base_url`, `escape_path`, `retry_request?`)
-4. Request-level options (`**__options__`: `headers:`, `query:`, `body:`, `connection_options:`, `retries:`, `sleep:`, `return:`)
+4. Request-level options (`**__options__`: `headers:`, `query:`, `body:`, `connection_options:`, `retries:`, `sleep:`, `backoff:`, `max_sleep:`, `jitter:`, `return:`)
 
 ## Key Patterns
 

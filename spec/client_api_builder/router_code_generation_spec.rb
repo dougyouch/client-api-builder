@@ -91,7 +91,33 @@ describe ClientApiBuilder::Router do
     it 'defaults the sleep time' do
       router_class.configure_retries(4)
 
-      expect(router_class.default_options).to include(max_retries: 4, sleep: 0.05)
+      expect(router_class.default_options).to include(max_retries: 4, sleep: 0.05, backoff: 1, max_sleep: nil, jitter: false)
+    end
+
+    it 'sets the backoff and max sleep' do
+      router_class.configure_retries(5, 0.1, backoff: 3, max_sleep: 2, jitter: 0.5)
+
+      expect(router_class.default_options).to include(max_retries: 5, sleep: 0.1, backoff: 3, max_sleep: 2, jitter: 0.5)
+    end
+  end
+
+  describe '.configure_exponential_retries' do
+    it 'configures doubling sleeps capped at max' do
+      router_class.configure_exponential_retries(attempts: 5, initial: 0.2, max: 4)
+
+      expect(router_class.default_options).to include(max_retries: 5, sleep: 0.2, backoff: 2, max_sleep: 4)
+    end
+
+    it 'defaults the initial sleep, max sleep and multiplier' do
+      router_class.configure_exponential_retries(attempts: 3)
+
+      expect(router_class.default_options).to include(max_retries: 3, sleep: 0.1, backoff: 2, max_sleep: 10, jitter: false)
+    end
+
+    it 'accepts a custom multiplier' do
+      router_class.configure_exponential_retries(attempts: 3, multiplier: 3, jitter: true)
+
+      expect(router_class.default_options).to include(backoff: 3, jitter: true)
     end
   end
 
