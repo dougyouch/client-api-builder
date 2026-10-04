@@ -16,6 +16,7 @@ A Ruby gem for building robust, secure API clients through declarative configura
 - **Nested Routing** - Organize complex APIs with hierarchical route structures
 - **Retry Logic** - Configurable automatic retries for transient network failures
 - **Connection Pooling** - Opt-in persistent connections shared across threads, with no extra gems
+- **Per-Thread Connections** - Opt-in persistent connections dedicated to each thread, with no pool to size
 - **HTTP/2** - Opt-in HTTP/2 over TLS, multiplexing concurrent requests on one connection per host (with the `http-2` gem)
 - **Streaming Support** - Handle large payloads efficiently with streaming to files or IO
 - **ActiveSupport Integration** - Optional logging and instrumentation
@@ -400,9 +401,41 @@ The pools live on the class, like ActiveRecord's, so every instance shares them:
 
 Pooling uses only `Net::HTTP` from the standard library.
 
+### Per-Thread Connections
+
+When a program runs a fixed set of worker threads, each making its own requests, include `ClientApiBuilder::ThreadConnections` (after `Router`, instead of `ConnectionPools`) to give every thread its own persistent connections:
+
+```ruby
+class MyApiClient
+  include ClientApiBuilder::Router
+  include ClientApiBuilder::ThreadConnections
+
+  base_url 'https://api.example.com'
+
+  # Optional; these are the defaults
+  connection_per_thread ttl: 30,        # seconds before a connection is closed and replaced
+                        idle_timeout: 2 # seconds idle before Net::HTTP reconnects (keep_alive_timeout)
+end
+
+workers = Array.new(20) do
+  Thread.new do
+    client = MyApiClient.new
+    user_ids.each { |id| client.get_user(id: id) } # always over this thread's connection
+  end
+end
+```
+
+A thread opens a connection per host (scheme, port and connection options) on its first request and reuses it for every later one. There's no pool size to keep in step with the thread count, and no thread ever waits for another's connection.
+
+- Sockets the server has closed, or that sat idle past `idle_timeout`, are reopened automatically. A connection whose request raised is closed rather than reused.
+- A request made while the thread's connection is busy (from inside a streaming block, or from another fiber on the thread) opens a connection of its own; the thread keeps one of the two afterwards.
+- Connections of threads that have finished are closed when a thread makes its first request. With short-lived threads, prefer `ConnectionPools`.
+- Sections and subclasses share the class's connections the same way they share pools, and a section can call `connection_per_thread` in its block to get its own.
+- After a fork, the child process opens its own connections. `MyApiClient.close_connections` closes every thread's idle connections now and in-use ones when their request ends.
+
 ### HTTP/2
 
-Include `ClientApiBuilder::HTTP2` (after `Router`, and after `ConnectionPools` if you use both) to send https requests over HTTP/2. It needs the [`http-2`](https://rubygems.org/gems/http-2) gem, which isn't installed with this one:
+Include `ClientApiBuilder::HTTP2` (after `Router`, and after `ConnectionPools` or `ThreadConnections` if you use either) to send https requests over HTTP/2. It needs the [`http-2`](https://rubygems.org/gems/http-2) gem, which isn't installed with this one:
 
 ```ruby
 # Gemfile
@@ -421,13 +454,13 @@ end
 
 Every instance of the class shares one connection per host (and connection options), and concurrent requests from different threads travel over it as separate streams. Responses are ordinary `Net::HTTPResponse` objects with `http_version` `'2.0'`, so `handle_response`, `UnexpectedResponse#response` and streaming routes work unchanged.
 
-- The protocol is negotiated during the TLS handshake (ALPN). When a server picks HTTP/1.1, that host is remembered and its requests go through `Net::HTTP`, or the connection pools if the class includes `ConnectionPools`. `http://` URLs always use HTTP/1.1.
+- The protocol is negotiated during the TLS handshake (ALPN). When a server picks HTTP/1.1, that host is remembered and its requests go through `Net::HTTP`, or the pooled or per-thread connections if the class includes `ConnectionPools` or `ThreadConnections`. `http://` URLs always use HTTP/1.1.
 - The usual connection options apply: `open_timeout`, `read_timeout` (per response header and body chunk), and the SSL options (`verify_mode`, `ca_file`, `cert_store`, `cert`, `key`, ...). Proxies aren't supported.
 - When the server's limit on concurrent streams is reached, a request waits up to `read_timeout` for a stream to free up.
 - Gzip and deflate responses are inflated, as `Net::HTTP` does, unless you set `Accept-Encoding` yourself.
 - A stream the server refused, or never processed before closing the connection (GOAWAY), raises `ClientApiBuilder::HTTP2::StreamRefused`; a dropped connection raises `ClientApiBuilder::HTTP2::ConnectionLost`. Both are retried by `configure_retries`. A stream the server reset raises `ClientApiBuilder::HTTP2::StreamError`.
 - Response data is acknowledged to the server as it arrives, so a streaming consumer slower than the server buffers the difference in memory.
-- Sections use their root client's connections. After a fork, the child opens its own. `MyApiClient.close_connections` closes the HTTP/2 connections (and the pools).
+- Sections use their root client's connections. After a fork, the child opens its own. `MyApiClient.close_connections` closes the HTTP/2 connections (and the pooled or per-thread ones).
 
 **When it's faster.** `script/benchmark_http2.rb` compares a new connection per request, `ConnectionPools` and HTTP/2 against a local TLS server. On one machine (Ruby 4.0.7, http-2 1.2.3):
 
@@ -437,7 +470,7 @@ Every instance of the class shares one connection per host (and connection optio
 | 50 threads, 20ms delay, one pooled connection per thread | 628 req/s | 1,904 req/s | 1,765 req/s |
 | 50 threads, 20ms delay, default pool of 5 | 640 req/s | 208 req/s | 1,706 req/s |
 
-HTTP/2 avoids a TLS handshake per request, like the pools, and isn't limited by a connection count: many threads waiting on a slow API share one connection. Per request, it costs more client CPU than pooled HTTP/1.1 (the protocol layer is pure Ruby), which shows most with large bodies. If you can give the pools a connection per thread, they're usually as fast or faster.
+HTTP/2 avoids a TLS handshake per request, like the pools, and isn't limited by a connection count: many threads waiting on a slow API share one connection. Per request, it costs more client CPU than pooled HTTP/1.1 (the protocol layer is pure Ruby), which shows most with large bodies. If you can give each thread its own connection (a pool as large as the thread count, or `ThreadConnections`), HTTP/1.1 is usually as fast or faster.
 
 ### Retry Configuration
 
@@ -759,7 +792,8 @@ end
 | `configure_retries(max_attempts, sleep = 0.05, backoff: 1, max_sleep: nil, jitter: false)` | Configure retry behavior |
 | `configure_exponential_retries(attempts:, initial: 0.1, max: 10, multiplier: 2, jitter: false)` | Configure retries with exponential backoff |
 | `connection_pool(**settings)` | Configure persistent connection pools (requires `include ClientApiBuilder::ConnectionPools`) |
-| `close_connections` | Close the class's pooled connections and its sections' (with `ConnectionPools`) |
+| `connection_per_thread(**settings)` | Configure persistent per-thread connections (requires `include ClientApiBuilder::ThreadConnections`) |
+| `close_connections` | Close the class's pooled or per-thread connections and its sections' (with `ConnectionPools` or `ThreadConnections`) |
 | `section_routers` | Section router classes by name |
 | `route(name, path, options)` | Define an API endpoint |
 | `section(name, options, &block)` | Define nested routes; `inherit:` opts into the root client's `:headers`, `:query_params` and/or `:connection_options` |
@@ -783,7 +817,7 @@ Define these in your client to change default behavior:
 | Method | Default |
 |--------|---------|
 | `retry_request?(exception, options)` | `true` for the network errors listed under Retry Configuration |
-| `with_http_connection(uri, connection_options, &block)` | Yields a started `Net::HTTP`: a new connection per request, or a pooled one with `ConnectionPools` |
+| `with_http_connection(uri, connection_options, &block)` | Yields a started `Net::HTTP`: a new connection per request, a pooled one with `ConnectionPools`, or the thread's own with `ThreadConnections` |
 | `escape_path(value)` | Percent-encodes path values (`ERB::Util.url_encode`) |
 | `parse_response(response, options)` | Parses the body as JSON, `nil` when empty |
 | `handle_response(response, options, &block)` | Applies `return:`, parsing and the response block |

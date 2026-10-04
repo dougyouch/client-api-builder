@@ -22,6 +22,10 @@ lib/
     │   ├── pool_set.rb                # A class's pools, one per host and connection options
     │   ├── pool.rb                    # Thread-safe pool of connections to one host
     │   └── connection.rb              # A started Net::HTTP session with opened/last-used times
+    ├── thread_connections.rb          # Opt-in persistent connections dedicated to each thread
+    ├── thread_connections/
+    │   ├── settings.rb                # Validated ttl/idle_timeout and defaults
+    │   └── connection_set.rb          # A class's connections, per thread and host
     ├── http2.rb                       # Opt-in HTTP/2 for https (needs the http-2 gem)
     ├── http2/
     │   ├── connection_set.rb          # A class's HTTP/2 connections, one per origin; HTTP/1.1-only origins
@@ -174,9 +178,16 @@ Opt-in persistent connections. Including it (after `Router`) overrides `with_htt
 - **Pool**: a `Mutex` and `ConditionVariable` around a stack of idle connections and a count of open ones. Checkout reuses the most recently returned connection, opens a new one if under `max_connections`, or waits up to `checkout_timeout` and raises `ConnectionPools::TimeoutError`. Connections past their `ttl`, or opened before `close`, are closed at checkout or check-in; a connection whose block raised is closed instead of returned. Sockets are opened and closed outside the lock. Uses a monotonic clock, injectable for specs.
 - **Connection**: a started `Net::HTTP` with `opened_at`/`last_used_at`. `Net::HTTP` itself reopens the socket when the server has closed it or it sat idle past `keep_alive_timeout`, and retries idempotent requests once on a stale connection.
 
-### 8. HTTP2 Module
+### 8. ThreadConnections Module
 
-Opt-in HTTP/2, built on the `http-2` gem (framing, HPACK, flow control), which is loaded when a class includes the module and isn't a runtime dependency. Including it (after `Router`, and after `ConnectionPools`, whose `included` hook rejects the other order) overrides `with_http_connection`: for https it asks the class's `ConnectionSet` for a connection and yields it, and otherwise (http, or an HTTP/1.1-only origin) calls `super`, which is `ConnectionPools` or `Net::HTTP.start`. The yielded `Connection` answers `request(net_request) { |response| }` like `Net::HTTP`, so `NetHTTP::Request` doesn't change. `close_connections` closes the set and calls `super` when `ConnectionPools` is included.
+The alternative to `ConnectionPools` for a fixed set of worker threads: each thread keeps its own connections, so there's no size limit, waiting or checkout timeout. Including it (after `Router`; its `included` hook rejects `ConnectionPools` in the same class, and `ConnectionPools` rejects it) overrides `with_http_connection` to use the class's `ConnectionSet`, and adds `connection_per_thread(**settings)` and `close_connections`. Sections and subclasses work as with the pools: `NestedRouter.connection_per_thread` includes the module into the section class, and `close_connections` walks `section_routers`.
+
+- **Settings**: `Data` value (`ttl: 30`, `idle_timeout: 2`), validated on creation.
+- **ConnectionSet**: stored with `redefine_class_method(:thread_connections, ...)`. A hash of `Thread => { [scheme, host, port, connection options] => ConnectionPools::Connection }` under one mutex, held only to take or put back a connection. A request takes the thread's connection out of the hash and puts it back afterwards, so a request made while it's out (re-entrant, or another fiber) opens its own, and the second one back is closed. Expired connections, those opened before `close`, and those whose block raised are closed instead of kept. A thread's first request sweeps out dead threads and closes their connections. Fork-aware like `PoolSet`; monotonic clock injectable for specs.
+
+### 9. HTTP2 Module
+
+Opt-in HTTP/2, built on the `http-2` gem (framing, HPACK, flow control), which is loaded when a class includes the module and isn't a runtime dependency. Including it (after `Router`, and after `ConnectionPools` or `ThreadConnections`, whose `included` hooks reject the other order) overrides `with_http_connection`: for https it asks the class's `ConnectionSet` for a connection and yields it, and otherwise (http, or an HTTP/1.1-only origin) calls `super`, which is `ConnectionPools`, `ThreadConnections` or `Net::HTTP.start`. The yielded `Connection` answers `request(net_request) { |response| }` like `Net::HTTP`, so `NetHTTP::Request` doesn't change. `close_connections` closes the set and calls `super` when `ConnectionPools` or `ThreadConnections` is included.
 
 - **ConnectionSet**: stored on the class with `redefine_class_method(:http2_connections, ...)`. One `Connection` per host, port and connection options, replaced once it stops taking streams; origins whose server chose HTTP/1.1 during ALPN are remembered (until `close`). Fork-aware like `PoolSet`. Opens connections while holding its lock.
 - **TLSSocket**: `Socket.tcp` plus an `SSLSocket` offering `h2` and `http/1.1`, configured from `Net::HTTP`'s SSL connection options (`set_params`, so `VERIFY_PEER` by default), with SNI for host names, a non-blocking handshake bounded by `open_timeout` (`Net::OpenTimeout`), and `post_connection_check` under the same rule as `Net::HTTP`.
@@ -184,11 +195,11 @@ Opt-in HTTP/2, built on the `http-2` gem (framing, HPACK, flow control), which i
 - **Exchange**: a `Thread::Queue` of one stream's events (headers, data, close) or a connection failure, popped with `read_timeout` (`Net::ReadTimeout`). Skips 1xx headers and ignores trailers; maps `REFUSED_STREAM` to `StreamRefused` and other resets to `StreamError`.
 - **RequestHeaders / ResponseBuilder / ResponseBody**: translate between `Net::HTTP` objects and HTTP/2. Requests get pseudo-headers (`Host` becomes `:authority`), lose connection-specific headers and gain `content-length` for a body. Responses are the `Net::HTTPResponse` subclass for the status (`http_version` `'2.0'`, empty message) extended with `ResponseBody`, whose `read_body` follows `Net::HTTP`'s rules (string, buffer or block, once; nil for HEAD/204/304) and inflates gzip/deflate when `decode_content` is set.
 
-### 9. RouteValueValidator Module
+### 10. RouteValueValidator Module
 
 `generate_route_code` calls `RouteValueValidator.validate!(route_name, :query/:body, value)` before generating anything. Values are compiled into the generated source, so only `String`, `Integer`, finite `Float`, `true`, `false`, `nil`, argument symbols (valid identifiers) and `Hash`/`Array` of those are allowed; anything else raises `ArgumentError` naming the route, the location and the value's class. Symbol keys that aren't identifiers are written as `:"content-type" =>`.
 
-### 10. QueryParams Class
+### 11. QueryParams Class
 
 Standalone query parameter builder (the default `query_builder` when `Hash#to_query` is unavailable, and the `:query_params` builder option):
 
@@ -197,7 +208,7 @@ Standalone query parameter builder (the default `query_builder` when `Hash#to_qu
 - Configurable separators: `name_value_separator` (default `=`), `param_separator` (default `&`)
 - Supports custom escape proc
 
-### 11. ActiveSupport Integration
+### 12. ActiveSupport Integration
 
 **ActiveSupportNotifications** (included when `ActiveSupport` is defined at the time a class includes `Router`):
 - Overrides `instrument_request` to use `ActiveSupport::Notifications.instrument`
@@ -294,4 +305,4 @@ route :download, '/file', stream: true     # alias for :file
 
 ## Thread Safety
 
-The namespace stack used while defining routes is thread-local. Clients themselves are not thread-safe. Each client instance maintains state (`@response`, `@request_options`, etc.) that would cause race conditions if shared across threads. Create separate client instances per thread. With `ConnectionPools`, those instances share the class's thread-safe pools; with `HTTP2`, they share its connections, whose streams are safe to use from many threads at once.
+The namespace stack used while defining routes is thread-local. Clients themselves are not thread-safe. Each client instance maintains state (`@response`, `@request_options`, etc.) that would cause race conditions if shared across threads. Create separate client instances per thread. With `ConnectionPools`, those instances share the class's thread-safe pools; with `ThreadConnections`, each thread's instances share that thread's connections; with `HTTP2`, they share its connections, whose streams are safe to use from many threads at once.

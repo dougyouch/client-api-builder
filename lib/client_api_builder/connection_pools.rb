@@ -26,6 +26,9 @@ module ClientApiBuilder
       unless base.include?(::ClientApiBuilder::Router)
         raise ArgumentError, 'include ClientApiBuilder::Router before ClientApiBuilder::ConnectionPools'
       end
+      if base.include?(::ClientApiBuilder::ThreadConnections)
+        raise ArgumentError, 'include either ClientApiBuilder::ConnectionPools or ClientApiBuilder::ThreadConnections'
+      end
       # HTTP2 falls back to the pools through super, so it must come after them
       if base.ancestors.any? { |mod| mod.name == 'ClientApiBuilder::HTTP2' }
         raise ArgumentError, 'include ClientApiBuilder::ConnectionPools before ClientApiBuilder::HTTP2'
