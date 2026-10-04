@@ -429,6 +429,16 @@ Every instance of the class shares one connection per host (and connection optio
 - Response data is acknowledged to the server as it arrives, so a streaming consumer slower than the server buffers the difference in memory.
 - Sections use their root client's connections. After a fork, the child opens its own. `MyApiClient.close_connections` closes the HTTP/2 connections (and the pools).
 
+**When it's faster.** `script/benchmark_http2.rb` compares a new connection per request, `ConnectionPools` and HTTP/2 against a local TLS server. On one machine (Ruby 4.0.7, http-2 1.2.3):
+
+| Scenario (1000 requests) | New connection | Pooled | HTTP/2 |
+|---|---|---|---|
+| 1 thread, no server delay | 501 req/s | 4,824 req/s | 2,057 req/s |
+| 50 threads, 20ms delay, one pooled connection per thread | 628 req/s | 1,904 req/s | 1,765 req/s |
+| 50 threads, 20ms delay, default pool of 5 | 640 req/s | 208 req/s | 1,706 req/s |
+
+HTTP/2 avoids a TLS handshake per request, like the pools, and isn't limited by a connection count: many threads waiting on a slow API share one connection. Per request, it costs more client CPU than pooled HTTP/1.1 (the protocol layer is pure Ruby), which shows most with large bodies. If you can give the pools a connection per thread, they're usually as fast or faster.
+
 ### Retry Configuration
 
 Configure automatic retries for transient failures:

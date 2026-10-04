@@ -34,6 +34,9 @@ gem build client-api-builder.gemspec
 
 # IRB with the gem and the example clients loaded
 script/console
+
+# Compare new-connection, pooled HTTP/1.1 and HTTP/2 throughput (see --help)
+bundle exec ruby script/benchmark_http2.rb
 ```
 
 ## Testing
