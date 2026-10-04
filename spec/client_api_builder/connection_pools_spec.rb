@@ -106,6 +106,99 @@ describe ClientApiBuilder::ConnectionPools do
     end
   end
 
+  describe 'sections' do
+    let(:client_class) do
+      Class.new do
+        include ClientApiBuilder::Router
+        include ClientApiBuilder::ConnectionPools
+
+        base_url 'http://example.com'
+        route :get_user, '/users/:id'
+
+        section :orders do
+          route :get_order, '/orders/:id'
+        end
+
+        section :uploads do
+          base_url 'http://uploads.example.com'
+          route :get_upload, '/uploads/:id'
+        end
+
+        section :reports do
+          base_url 'http://reports.example.com'
+          connection_pool max_connections: 2, ttl: 10
+          route :get_report, '/reports/:id'
+
+          section :exports do
+            route :get_export, '/exports/:id'
+          end
+        end
+      end
+    end
+
+    let(:client) { client_class.new }
+
+    before do
+      stub_request(:get, %r{\Ahttp://(uploads\.|reports\.)?example\.com/}).to_return(body: '{}')
+    end
+
+    def pool_hosts(pool_set)
+      pool_set.pools.map(&:host)
+    end
+
+    it 'gives a section with its own base_url a separate pool in the root client pools' do
+      client.get_user(id: 1)
+      client.orders.get_order(id: 2)
+      client.uploads.get_upload(id: 3)
+
+      expect(pool_hosts(client_class.connection_pools)).to contain_exactly('example.com', 'uploads.example.com')
+      expect(client_class.connection_pools.pools.map(&:size)).to eq([1, 1])
+    end
+
+    it 'uses its own pools and settings in a section that calls connection_pool' do
+      client.reports.get_report(id: 1)
+
+      reports_pools = client_class.reports_router.connection_pools
+      expect(pool_hosts(reports_pools)).to eq(['reports.example.com'])
+      expect(reports_pools.settings.to_h).to include(max_connections: 2, ttl: 10)
+      expect(client_class.connection_pools.pools).to be_empty
+    end
+
+    it 'uses the root client pools, like its base_url, in a section nested in a pooled one' do
+      client.reports.exports.get_export(id: 1)
+
+      expect(pool_hosts(client_class.connection_pools)).to eq(['example.com'])
+      expect(client_class.reports_router.connection_pools.pools).to be_empty
+    end
+
+    it 'gives a section its own pools when the root client has none' do
+      plain = Class.new do
+        include ClientApiBuilder::Router
+
+        base_url 'http://example.com'
+        section(:pooled) { connection_pool max_connections: 1 }
+      end
+      plain.pooled_router.route :get_user, '/users/:id'
+
+      plain.new.pooled.get_user(id: 1)
+
+      expect(plain.pooled_router.connection_pools.pools.first.idle_size).to eq(1)
+      expect(plain).not_to respond_to(:connection_pools)
+    end
+
+    it 'closes section pools, including nested ones, with the root client close_connections' do
+      client_class.section(:outer) { section(:inner) { connection_pool } }
+      client_class.outer_router.inner_router.route :get_user, '/users/:id'
+      client.reports.get_report(id: 1)
+      client.outer.inner.get_user(id: 1)
+
+      client_class.close_connections
+
+      expect(client_class.reports_router.connection_pools.pools.map(&:size)).to eq([0])
+      expect(client_class.outer_router.inner_router.connection_pools.pools.map(&:size)).to eq([0])
+    end
+  end
+
   describe 'against a real server' do
     let(:server) { KeepAliveServer.new }
     let(:client_class) do

@@ -44,6 +44,21 @@ module ClientApiBuilder
                            "Allowed: #{INHERITABLE_SETTINGS.map(&:inspect).join(', ')}"
     end
 
+    # Gives this section its own connection pools (see ConnectionPools.connection_pool).
+    # Including ConnectionPools puts its connection_pool ahead of this one, so the call
+    # below configures the pools rather than recursing.
+    def self.connection_pool(**settings)
+      include ::ClientApiBuilder::ConnectionPools
+
+      connection_pool(**settings)
+    end
+
+    # Closes the pools of any nested sections that have their own; a section with its own
+    # pools uses ConnectionPools.close_connections, which closes those as well
+    def self.close_connections
+      section_routers.each_value(&:close_connections)
+    end
+
     def configured_headers
       inherits_from_root?(:headers) ? root_router.configured_headers.merge(super) : super
     end
@@ -64,7 +79,7 @@ module ClientApiBuilder
       root_router.handle_response(response, options, &)
     end
 
-    # Uses the root client's connections, so a client's sections share its connection pools
+    # Uses the root client's connections unless this section calls connection_pool
     def with_http_connection(uri, connection_options, &)
       root_router.with_http_connection(uri, connection_options, &)
     end

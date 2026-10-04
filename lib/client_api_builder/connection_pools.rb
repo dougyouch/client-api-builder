@@ -38,9 +38,11 @@ module ClientApiBuilder
         redefine_class_method(:connection_pools, PoolSet.new(Settings.new(**settings)))
       end
 
-      # Closes idle connections now and in-use ones when they are returned
+      # Closes idle connections now and in-use ones when they are returned, including the
+      # pools of sections that have their own
       def close_connections
         connection_pools.close
+        section_routers.each_value(&:close_connections)
       end
     end
 

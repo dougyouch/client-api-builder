@@ -380,9 +380,19 @@ The pools live on the class, like ActiveRecord's, so every instance shares them:
 - Sockets the server has closed, or that sat idle past `idle_timeout`, are reopened automatically.
 - A connection whose request raised is closed rather than reused.
 - When no connection frees up within `checkout_timeout`, the request raises `ClientApiBuilder::ConnectionPools::TimeoutError`.
-- Sections use their root client's pools. Subclasses share their parent's pools unless they call `connection_pool` themselves.
+- Sections use their root client's pools, getting a separate pool for any other host in their `base_url`. Subclasses share their parent's pools unless they call `connection_pool` themselves.
+- A section can call `connection_pool` in its block to get its own pools and settings. This works whether or not the root client includes `ConnectionPools`:
+
+  ```ruby
+  section :uploads do
+    base_url 'https://uploads.example.com'
+    connection_pool max_connections: 2, ttl: 10
+  end
+  ```
+
+  Sections nested inside it still fall back to the root client, as they do for `base_url`.
 - After a fork (Puma, Sidekiq, Resque), the child process opens its own connections.
-- `MyApiClient.close_connections` closes idle connections now and in-use ones when they're returned.
+- `MyApiClient.close_connections` closes idle connections now and in-use ones when they're returned, including the pools of sections that have their own.
 
 Pooling uses only `Net::HTTP` from the standard library.
 
@@ -684,7 +694,8 @@ end
 | `connection_option(name, value)` | Set Net::HTTP connection options |
 | `configure_retries(max_attempts, sleep = 0.05)` | Configure retry behavior |
 | `connection_pool(**settings)` | Configure persistent connection pools (requires `include ClientApiBuilder::ConnectionPools`) |
-| `close_connections` | Close the class's pooled connections (with `ConnectionPools`) |
+| `close_connections` | Close the class's pooled connections and its sections' (with `ConnectionPools`) |
+| `section_routers` | Section router classes by name |
 | `route(name, path, options)` | Define an API endpoint |
 | `section(name, options, &block)` | Define nested routes; `inherit:` opts into the root client's `:headers`, `:query_params` and/or `:connection_options` |
 | `namespace(path, &block)` | Add path prefix to routes in block |
