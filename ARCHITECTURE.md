@@ -43,7 +43,8 @@ The `Router` module is the core component that provides the main functionality f
 - `query_builder`: Configures query parameter formatting
 - `query_param`: Adds query parameters to all requests
 - `connection_option`: Sets Net::HTTP connection options
-- `configure_retries`: Sets retry behavior (max_retries, sleep time)
+- `configure_retries`: Sets retry behavior (max_retries, sleep time, optional `backoff:` multiplier, `max_sleep:` cap and `jitter:`)
+- `configure_exponential_retries`: Shorthand for `configure_retries` with exponential backoff (`attempts:`, `initial:`, `max:`, `multiplier:`, `jitter:`)
 - `namespace`: Groups routes under a common path prefix
 
 **Instance Methods**:
@@ -236,7 +237,7 @@ end
 1. **Default Options**: `ClassMethods#default_options` returns a frozen hash of defaults
 2. **Class-level Configuration**: DSL methods redefine `default_options` via `add_value_to_class_method`; subclasses inherit it
 3. **Instance overrides**: Clients can override instance methods such as `base_url` or the hooks above
-4. **Request-level**: `**__options__` on generated methods (`headers:`, `query:`, `body:`, `connection_options:`, `retries:`, `sleep:`, `return:`)
+4. **Request-level**: `**__options__` on generated methods (`headers:`, `query:`, `body:`, `connection_options:`, `retries:`, `sleep:`, `backoff:`, `max_sleep:`, `jitter:`, `return:`)
 
 ## Error Handling
 
@@ -247,6 +248,7 @@ end
 - Response procs: Per-route custom response handling stored in `default_options[:response_procs]`; a block passed to the call takes precedence. `route` always records its block (nil clears it), so redefining a route without a block drops the previous or inherited one
 - Retry on exception: `retry_request?` returns true only for network errors (`Net::OpenTimeout`, `Net::ReadTimeout`, `Errno::ECONNRESET`, `Errno::ECONNREFUSED`, `Errno::ETIMEDOUT`, `SocketError`, `EOFError`); override to customize
 - Retries count total attempts: `configure_retries 3` makes at most 3 attempts, and the default of 1 means no retries
+- The sleep before retry n is `sleep * backoff**(n - 1)`, capped at `max_sleep`; the default `backoff` of 1 keeps it fixed. `apply_retry_jitter` then shortens it by a random amount (`jitter: true` up to all of it, a number up to that fraction)
 
 ## Streaming Support
 

@@ -480,6 +480,54 @@ describe ClientApiBuilder::Router do
       expect(router).to have_received(:sleep).with(0.25)
     end
 
+    it 'grows the sleep exponentially up to the max sleep' do
+      router_class.configure_exponential_retries(attempts: 5, initial: 0.1, max: 0.3)
+      stub_request(:get, 'http://example.com/items').to_timeout.times(4).then.to_return(body: '{}')
+      allow(router).to receive(:sleep)
+
+      router.get_items
+      expect(router).to have_received(:sleep).with(0.1).ordered
+      expect(router).to have_received(:sleep).with(0.2).ordered
+      expect(router).to have_received(:sleep).with(0.3).twice.ordered
+    end
+
+    it 'accepts backoff and max sleep per request' do
+      stub_request(:get, 'http://example.com/items').to_timeout.times(2).then.to_return(body: '{}')
+      allow(router).to receive(:sleep)
+
+      router.get_items(retries: 3, sleep: 1, backoff: 5, max_sleep: 4)
+      expect(router).to have_received(:sleep).with(1).ordered
+      expect(router).to have_received(:sleep).with(4).ordered
+    end
+
+    it 'shortens the sleep by up to all of it with full jitter' do
+      router_class.configure_retries(2, 0.4, jitter: true)
+      stub_request(:get, 'http://example.com/items').to_timeout.then.to_return(body: '{}')
+      allow(router).to receive_messages(sleep: nil, rand: 0.75)
+
+      router.get_items
+      expect(router).to have_received(:sleep).with(be_within(1e-9).of(0.1))
+    end
+
+    it 'shortens the sleep by up to a fraction of it with partial jitter' do
+      router_class.configure_exponential_retries(attempts: 3, initial: 0.4, jitter: 0.5)
+      stub_request(:get, 'http://example.com/items').to_timeout.times(2).then.to_return(body: '{}')
+      allow(router).to receive_messages(sleep: nil, rand: 0.5)
+
+      router.get_items
+      expect(router).to have_received(:sleep).with(be_within(1e-9).of(0.3)).ordered
+      expect(router).to have_received(:sleep).with(be_within(1e-9).of(0.6)).ordered
+    end
+
+    it 'lets a request turn jitter off' do
+      router_class.configure_retries(2, 0.4, jitter: true)
+      stub_request(:get, 'http://example.com/items').to_timeout.then.to_return(body: '{}')
+      allow(router).to receive(:sleep)
+
+      router.get_items(jitter: false)
+      expect(router).to have_received(:sleep).with(0.4)
+    end
+
     it 'skips sleeping when no sleep time is configured' do
       stub_request(:get, 'http://example.com/items').to_timeout.then.to_return(body: '{}')
       allow(router).to receive(:get_retry_request_sleep_time).and_return(nil)

@@ -60,7 +60,10 @@ module ClientApiBuilder
           query_params: {},
           response_procs: {},
           max_retries: 1,
-          sleep: 0.05
+          sleep: 0.05,
+          backoff: 1,
+          max_sleep: nil,
+          jitter: false
         }.freeze
       end
 
@@ -127,12 +130,25 @@ module ClientApiBuilder
         add_value_to_class_method(:default_options, connection_options: connection_options)
       end
 
-      def configure_retries(max_retries, sleep_time_between_retries_in_seconds = 0.05)
+      # max_retries is the total number of attempts. The sleep before retry n is
+      # sleep * backoff**(n - 1), capped at max_sleep when given. jitter randomly
+      # shortens each sleep: true by up to all of it, a number (0..1) by up to that fraction.
+      def configure_retries(max_retries, sleep_time_between_retries_in_seconds = 0.05,
+                            backoff: 1, max_sleep: nil, jitter: false)
         add_value_to_class_method(
           :default_options,
           max_retries: max_retries,
-          sleep: sleep_time_between_retries_in_seconds
+          sleep: sleep_time_between_retries_in_seconds,
+          backoff: backoff,
+          max_sleep: max_sleep,
+          jitter: jitter
         )
+      end
+
+      # configure_retries with a sleep that starts at initial and doubles (by default)
+      # after each failed attempt, never exceeding max
+      def configure_exponential_retries(attempts:, initial: 0.1, max: 10, multiplier: 2, jitter: false)
+        configure_retries(attempts, initial, backoff: multiplier, max_sleep: max, jitter: jitter)
       end
 
       # add a query param to all requests
@@ -635,7 +651,20 @@ module ClientApiBuilder
     end
 
     def get_retry_request_sleep_time(_exception, options)
-      options[:sleep] || self.class.default_options[:sleep] || 0.05
+      sleep_time = options[:sleep] || self.class.default_options[:sleep] || 0.05
+      backoff = options[:backoff] || self.class.default_options[:backoff] || 1
+      sleep_time *= backoff**(@request_attempts - 1)
+      max_sleep = options[:max_sleep] || self.class.default_options[:max_sleep]
+      sleep_time = [sleep_time, max_sleep].min if max_sleep
+      apply_retry_jitter(sleep_time, options.fetch(:jitter) { self.class.default_options[:jitter] })
+    end
+
+    # shortens sleep_time by a random amount: up to all of it for true, up to that fraction for a number
+    def apply_retry_jitter(sleep_time, jitter)
+      return sleep_time unless jitter
+
+      jitter = 1 if jitter == true
+      sleep_time * (1 - (jitter * rand))
     end
 
     def get_retry_request_max_retries(options)

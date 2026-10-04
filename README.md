@@ -126,6 +126,9 @@ client.get_user(
   connection_options: { read_timeout: 5 },
   retries: 3,                           # attempts for this call
   sleep: 0.5,                           # seconds between attempts
+  backoff: 2,                           # multiply the sleep by this after each retry
+  max_sleep: 5,                         # cap on the sleep between attempts
+  jitter: true,                         # randomly shorten each sleep (true, false or 0..1)
   return: :body                         # :body or :response instead of parsed JSON
 )
 ```
@@ -411,7 +414,28 @@ class MyApiClient
 end
 ```
 
-The first argument is the total number of attempts, not extra retries. The default is 1, so requests are not retried unless you configure it. `retries:` and `sleep:` can also be passed per request.
+The first argument is the total number of attempts, not extra retries. The default is 1, so requests are not retried unless you configure it.
+
+For exponential backoff, use `configure_exponential_retries`:
+
+```ruby
+class MyApiClient
+  include ClientApiBuilder::Router
+
+  # Up to 5 attempts, sleeping 0.1s, 0.2s, 0.4s, 0.8s between them (never more than 10s)
+  configure_exponential_retries attempts: 5, initial: 0.1, max: 10
+end
+```
+
+`initial` defaults to 0.1, `max` to 10 and the `multiplier` to 2. It is shorthand for `configure_retries 5, 0.1, backoff: 2, max_sleep: 10`: the sleep before retry n is `sleep * backoff**(n - 1)`, capped at `max_sleep`. `configure_retries` defaults to `backoff: 1` (a fixed sleep) and no cap.
+
+Add `jitter:` so many clients that fail together don't all retry at the same moment. `jitter: true` sleeps a random time between 0 and the computed sleep; a number between 0 and 1 shortens it by up to that fraction (`jitter: 0.5` sleeps between 50% and 100% of it):
+
+```ruby
+configure_exponential_retries attempts: 5, initial: 0.1, max: 10, jitter: true
+```
+
+`retries:`, `sleep:`, `backoff:`, `max_sleep:` and `jitter:` can also be passed per request.
 
 Only these network errors are retried by default:
 - `Net::OpenTimeout`, `Net::ReadTimeout`
@@ -692,7 +716,8 @@ end
 | `query_builder(builder)` | Configure query string serialization |
 | `query_param(name, value = nil, &block)` | Add a query parameter to all requests (value, method name symbol, or block) |
 | `connection_option(name, value)` | Set Net::HTTP connection options |
-| `configure_retries(max_attempts, sleep = 0.05)` | Configure retry behavior |
+| `configure_retries(max_attempts, sleep = 0.05, backoff: 1, max_sleep: nil, jitter: false)` | Configure retry behavior |
+| `configure_exponential_retries(attempts:, initial: 0.1, max: 10, multiplier: 2, jitter: false)` | Configure retries with exponential backoff |
 | `connection_pool(**settings)` | Configure persistent connection pools (requires `include ClientApiBuilder::ConnectionPools`) |
 | `close_connections` | Close the class's pooled connections and its sections' (with `ConnectionPools`) |
 | `section_routers` | Section router classes by name |
@@ -724,7 +749,7 @@ Define these in your client to change default behavior:
 | `handle_response(response, options, &block)` | Applies `return:`, parsing and the response block |
 | `expected_response_code!(response, codes, options)` | Raises `UnexpectedResponse` for unexpected codes |
 | `get_retry_request_max_retries(options)` | `retries:` option, then `configure_retries`, then 1 |
-| `get_retry_request_sleep_time(exception, options)` | `sleep:` option, then `configure_retries`, then 0.05 |
+| `get_retry_request_sleep_time(exception, options)` | `sleep:` option, then `configure_retries`, then 0.05; multiplied by `backoff**(attempt - 1)`, capped at `max_sleep`, then shortened by `jitter` |
 
 ## Requirements
 
