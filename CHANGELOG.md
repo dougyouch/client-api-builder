@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.10.0](https://github.com/dougyouch/client-api-builder/compare/v0.9.0...v0.10.0) (2026-10-04)
+
+
+### Features
+
+* add opt-in HTTP/2 support ([48c6f6e](https://github.com/dougyouch/client-api-builder/commit/48c6f6e37b9c346d2e8b70db30a72661ea18358e))
+* **http2:** add opt-in HTTP/2 support ([10ee136](https://github.com/dougyouch/client-api-builder/commit/10ee13677d1914dd37dd5efb2afee9779e2fdbda))
+
+
+### Performance Improvements
+
+* **http2:** add HTTP/1.1 vs HTTP/2 benchmark script ([29b9add](https://github.com/dougyouch/client-api-builder/commit/29b9adde11ae6dcf55a5f2eedf0c1826774bb51a))
+
 ## [0.9.0](https://github.com/dougyouch/client-api-builder/compare/v0.8.0...v0.9.0) (2026-10-04)
 
 
