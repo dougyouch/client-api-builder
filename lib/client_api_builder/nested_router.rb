@@ -64,6 +64,11 @@ module ClientApiBuilder
       root_router.handle_response(response, options, &)
     end
 
+    # Uses the root client's connections, so a client's sections share its connection pools
+    def with_http_connection(uri, connection_options, &)
+      root_router.with_http_connection(uri, connection_options, &)
+    end
+
     private
 
     def inherits_from_root?(setting)

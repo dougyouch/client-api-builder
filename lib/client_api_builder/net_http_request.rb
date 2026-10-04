@@ -43,11 +43,17 @@ module ClientApiBuilder
         ssl_options = uri.scheme == 'https' ? DEFAULT_SECURE_OPTIONS.merge(use_ssl: true) : {}
         merged_options = ssl_options.merge(connection_options)
 
-        Net::HTTP.start(uri.hostname, uri.port, merged_options) do |http|
+        with_http_connection(uri, merged_options) do |http|
           http.request(request) do |response|
             yield response if block_given?
           end
         end
+      end
+
+      # Yields a started Net::HTTP session for one request. By default each request opens
+      # and closes its own connection; ConnectionPools overrides this to reuse pooled ones.
+      def with_http_connection(uri, connection_options, &)
+        Net::HTTP.start(uri.hostname, uri.port, connection_options, &)
       end
 
       # validate_response, when given, is called with the response before its body is streamed

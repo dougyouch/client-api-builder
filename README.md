@@ -15,6 +15,7 @@ A Ruby gem for building robust, secure API clients through declarative configura
 - **Flexible Request Building** - Support for JSON, query params, and custom body builders
 - **Nested Routing** - Organize complex APIs with hierarchical route structures
 - **Retry Logic** - Configurable automatic retries for transient network failures
+- **Connection Pooling** - Opt-in persistent connections shared across threads, with no extra gems
 - **Streaming Support** - Handle large payloads efficiently with streaming to files or IO
 - **ActiveSupport Integration** - Optional logging and instrumentation
 - **Comprehensive Error Handling** - Detailed error information for debugging
@@ -355,6 +356,36 @@ end
 
 Any `Net::HTTP.start` option can be set this way. Your options are applied over the secure HTTPS defaults, so setting `verify_mode` yourself replaces `VERIFY_PEER`.
 
+### Persistent Connections
+
+By default each request opens and closes its own connection. Include `ClientApiBuilder::ConnectionPools` (after `Router`) to keep connections open and reuse them:
+
+```ruby
+class MyApiClient
+  include ClientApiBuilder::Router
+  include ClientApiBuilder::ConnectionPools
+
+  base_url 'https://api.example.com'
+
+  # Optional; these are the defaults
+  connection_pool max_connections: 5,  # connections per host
+                  ttl: 30,             # seconds before a connection is closed and replaced
+                  checkout_timeout: 5, # seconds to wait for a free connection
+                  idle_timeout: 2      # seconds idle before Net::HTTP reconnects (keep_alive_timeout)
+end
+```
+
+The pools live on the class, like ActiveRecord's, so every instance shares them: keep one client instance per thread and the threads share the connections. A connection is checked out for one request (or one streamed response) and returned straight after, so `max_connections` can be lower than your thread count. There is one pool per scheme, host, port and connection options.
+
+- Sockets the server has closed, or that sat idle past `idle_timeout`, are reopened automatically.
+- A connection whose request raised is closed rather than reused.
+- When no connection frees up within `checkout_timeout`, the request raises `ClientApiBuilder::ConnectionPools::TimeoutError`.
+- Sections use their root client's pools. Subclasses share their parent's pools unless they call `connection_pool` themselves.
+- After a fork (Puma, Sidekiq, Resque), the child process opens its own connections.
+- `MyApiClient.close_connections` closes idle connections now and in-use ones when they're returned.
+
+Pooling uses only `Net::HTTP` from the standard library.
+
 ### Retry Configuration
 
 Configure automatic retries for transient failures:
@@ -618,7 +649,7 @@ Only safe file modes are allowed for streaming to files: `w`, `wb`, `a`, `ab`, `
 
 ## Thread Safety
 
-Client instances are **not thread-safe**. Create a separate client instance per thread:
+Client instances are **not thread-safe**. Create a separate client instance per thread. To share connections between those instances, see [Persistent Connections](#persistent-connections).
 
 ```ruby
 # Correct: Create a new client for each thread
@@ -652,6 +683,8 @@ end
 | `query_param(name, value = nil, &block)` | Add a query parameter to all requests (value, method name symbol, or block) |
 | `connection_option(name, value)` | Set Net::HTTP connection options |
 | `configure_retries(max_attempts, sleep = 0.05)` | Configure retry behavior |
+| `connection_pool(**settings)` | Configure persistent connection pools (requires `include ClientApiBuilder::ConnectionPools`) |
+| `close_connections` | Close the class's pooled connections (with `ConnectionPools`) |
 | `route(name, path, options)` | Define an API endpoint |
 | `section(name, options, &block)` | Define nested routes; `inherit:` opts into the root client's `:headers`, `:query_params` and/or `:connection_options` |
 | `namespace(path, &block)` | Add path prefix to routes in block |
@@ -674,6 +707,7 @@ Define these in your client to change default behavior:
 | Method | Default |
 |--------|---------|
 | `retry_request?(exception, options)` | `true` for the network errors listed under Retry Configuration |
+| `with_http_connection(uri, connection_options, &block)` | Yields a started `Net::HTTP`: a new connection per request, or a pooled one with `ConnectionPools` |
 | `escape_path(value)` | Percent-encodes path values (`ERB::Util.url_encode`) |
 | `parse_response(response, options)` | Parses the body as JSON, `nil` when empty |
 | `handle_response(response, options, &block)` | Applies `return:`, parsing and the response block |

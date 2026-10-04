@@ -56,6 +56,8 @@ script/console
 
 - **NetHTTP::Request** (`lib/client_api_builder/net_http_request.rb`): HTTP request execution using `Net::HTTP`. Handles standard requests and streaming (`:file`, `:io`, `:block` modes).
 
+- **ConnectionPools** (`lib/client_api_builder/connection_pools.rb`, `connection_pools/`): Opt-in persistent connections (`include` after `Router`). Overrides `with_http_connection`, the single seam in `NetHTTP::Request` where a request gets its `Net::HTTP` session, to use class-level pools (`PoolSet` → one `Pool` per scheme/host/port/connection options → `Connection`). `connection_pool max_connections:, ttl:, checkout_timeout:, idle_timeout:` (defaults 5/30/5/2) and `close_connections`. Sections delegate `with_http_connection` to the root. No external gems.
+
 - **RouteValueValidator** (`lib/client_api_builder/route_value_validator.rb`): Checks a route's `query:`/`body:` values can be compiled into generated source (strings, numbers, booleans, nil, hashes, arrays, argument symbols); raises `ArgumentError` naming the route otherwise.
 
 - **QueryParams** (`lib/client_api_builder/query_params.rb`): Custom query parameter builder used when ActiveSupport's `to_query` is unavailable.
