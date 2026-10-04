@@ -6,6 +6,9 @@ require 'json'
 
 module ClientApiBuilder
   module Router
+    # Status codes accepted when a route lists no expected_response_codes
+    SUCCESS_CODE = /\A2\d\d\z/
+
     def self.included(base)
       base.extend InheritanceHelper::Methods
       base.extend ClassMethods
@@ -578,8 +581,10 @@ module ClientApiBuilder
       url
     end
 
+    # Checks the status code rather than the response class, so any response object with a
+    # Net::HTTPResponse-style string code works (e.g. from a non-Net::HTTP transport)
     def expected_response_code!(response, expected_response_codes, _options)
-      return if expected_response_codes.empty? && response.is_a?(Net::HTTPSuccess)
+      return if expected_response_codes.empty? && SUCCESS_CODE.match?(response.code.to_s)
       return if expected_response_codes.include?(response.code)
 
       raise(::ClientApiBuilder::UnexpectedResponse.new("unexpected response code #{response.code}", response))
@@ -686,7 +691,7 @@ module ClientApiBuilder
     def retry_request?(exception, _options)
       case exception
       when Net::OpenTimeout, Net::ReadTimeout, Errno::ECONNRESET,
-           Errno::ECONNREFUSED, Errno::ETIMEDOUT, SocketError, EOFError
+           Errno::ECONNREFUSED, Errno::ETIMEDOUT, SocketError, EOFError, ::ClientApiBuilder::RetryableError
         true
       else
         false

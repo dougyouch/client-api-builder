@@ -389,6 +389,24 @@ describe ClientApiBuilder::Router do
 
       expect { router.get_items }.to raise_error(ClientApiBuilder::UnexpectedResponse, 'unexpected response code 500')
     end
+
+    it 'accepts any 2xx code by default' do
+      stub_request(:get, 'http://example.com/items').to_return(status: 299)
+
+      expect(router.get_items(return: :response).code).to eq('299')
+    end
+
+    it 'rejects a 3xx code by default' do
+      stub_request(:get, 'http://example.com/items').to_return(status: 300)
+
+      expect { router.get_items }.to raise_error(ClientApiBuilder::UnexpectedResponse, 'unexpected response code 300')
+    end
+
+    it 'accepts a 2xx response that is not a Net::HTTPResponse' do
+      response = Struct.new(:code).new('204')
+
+      expect { router.expected_response_code!(response, [], {}) }.not_to raise_error
+    end
   end
 
   describe 'streaming' do
