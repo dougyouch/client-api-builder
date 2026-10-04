@@ -58,6 +58,8 @@ script/console
 
 - **ConnectionPools** (`lib/client_api_builder/connection_pools.rb`, `connection_pools/`): Opt-in persistent connections (`include` after `Router`). Overrides `with_http_connection`, the single seam in `NetHTTP::Request` where a request gets its `Net::HTTP` session, to use class-level pools (`PoolSet` → one `Pool` per scheme/host/port/connection options → `Connection`). `connection_pool max_connections:, ttl:, checkout_timeout:, idle_timeout:` (defaults 5/30/5/2) and `close_connections`. Sections delegate `with_http_connection` to the root unless they call `connection_pool` themselves (`NestedRouter.connection_pool` includes `ConnectionPools` into the section class); `close_connections` recurses through `section_routers`. No external gems.
 
+- **HTTP2** (`lib/client_api_builder/http2.rb`, `http2/`): Opt-in HTTP/2 for https (`include` after `Router` and after `ConnectionPools`). Needs the `http-2` gem, required on include (development dependency only). Overrides `with_http_connection`: `ConnectionSet` (one `Connection` per origin + connection options, remembers origins that chose HTTP/1.1 via ALPN) yields a `Connection` that answers `request(net_request) { |response| }` like `Net::HTTP`; otherwise `super`. `Connection` runs a reader thread and serializes all `HTTP2::Client` calls/writes under one mutex; each request's stream events go through an `Exchange` queue (`read_timeout`). Responses are real `Net::HTTPResponse` subclasses (`http_version` `'2.0'`) extended with `ResponseBody`. Errors: `StreamRefused`/`ConnectionLost` (`RetryableError`), `StreamError`, `ProtocolError`. Specs use `spec/support/http2_server.rb` (in-process TLS server with a self-signed cert; `attach` serves a `UNIXSocket.pair` end for `Connection` specs); WebMock doesn't see these sockets.
+
 - **RouteValueValidator** (`lib/client_api_builder/route_value_validator.rb`): Checks a route's `query:`/`body:` values can be compiled into generated source (strings, numbers, booleans, nil, hashes, arrays, argument symbols); raises `ArgumentError` naming the route otherwise.
 
 - **QueryParams** (`lib/client_api_builder/query_params.rb`): Custom query parameter builder used when ActiveSupport's `to_query` is unavailable.
@@ -84,6 +86,7 @@ Methods are auto-detected from the start of route names: `post/create/add/insert
 - `response`/`request_options` are cleared at the start of each attempt, so after a failure they are `nil` rather than the previous call's.
 - Streaming routes validate the status (via `validate_response:` → `expected_response_code!`) before streaming; error bodies go to `response.body`, never the file/IO/block.
 - `configure_retries(n)` sets total attempts (default 1, so no retries). Only network errors are retried (`retry_request?`). The sleep before retry n is `sleep * backoff**(n - 1)` capped at `max_sleep`, then randomly shortened by `jitter:` (`true` = full, 0..1 = up to that fraction); `configure_exponential_retries attempts:, initial:, max:` is shorthand for that.
+- `expected_response_code!` accepts any 2xx by status code (`Router::SUCCESS_CODE`), not by `Net::HTTPSuccess`, so non-`Net::HTTP` transports work. `retry_request?` also retries `ClientApiBuilder::RetryableError`.
 - Symbols/procs are resolved (on `root_router`) only for class-level `header`/`query_param` values. Route arguments and per-request `headers:`/`query:` are data and are sent as given.
 - `escape_path` percent-encodes every path value (arguments and `{name}`), including `/`, so each stays one segment.
 - HTTPS gets `VERIFY_PEER` and 30s/60s timeouts by default; user connection options override them.
@@ -106,6 +109,7 @@ Methods are auto-detected from the start of route names: `post/create/add/insert
 
 - `inheritance-helper` (runtime): Class inheritance and method management
 - `activesupport` (optional at runtime, installed for development): `to_query` builders and instrumentation
+- `http-2` (optional at runtime, installed for development): protocol layer for `ClientApiBuilder::HTTP2`
 - Development: `rspec`, `webmock`, `simplecov`, `rubocop`, `rubocop-rspec`, `rake`
 
 ## CI

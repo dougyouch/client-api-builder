@@ -6,6 +6,7 @@ gemspec
 
 group :development do
   gem 'activesupport'
+  gem 'http-2'
   gem 'rake'
   gem 'rspec'
   gem 'rubocop'

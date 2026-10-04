@@ -22,6 +22,15 @@ lib/
     │   ├── pool_set.rb                # A class's pools, one per host and connection options
     │   ├── pool.rb                    # Thread-safe pool of connections to one host
     │   └── connection.rb              # A started Net::HTTP session with opened/last-used times
+    ├── http2.rb                       # Opt-in HTTP/2 for https (needs the http-2 gem)
+    ├── http2/
+    │   ├── connection_set.rb          # A class's HTTP/2 connections, one per origin; HTTP/1.1-only origins
+    │   ├── connection.rb              # One HTTP/2 connection: reader thread, streams, GOAWAY
+    │   ├── exchange.rb                # One request's stream events, waited on by the calling thread
+    │   ├── tls_socket.rb              # TLS socket offering h2 via ALPN, with Net::HTTP's SSL options
+    │   ├── request_headers.rb         # Net::HTTP request => HTTP/2 header list
+    │   ├── response_builder.rb        # HTTP/2 headers => Net::HTTPResponse
+    │   └── response_body.rb           # read_body for those responses, reading the stream
     ├── query_params.rb                # Custom query parameter builder
     ├── route_value_validator.rb       # Checks route query/body values can be compiled
     ├── active_support_notifications.rb # ActiveSupport instrumentation
@@ -165,11 +174,21 @@ Opt-in persistent connections. Including it (after `Router`) overrides `with_htt
 - **Pool**: a `Mutex` and `ConditionVariable` around a stack of idle connections and a count of open ones. Checkout reuses the most recently returned connection, opens a new one if under `max_connections`, or waits up to `checkout_timeout` and raises `ConnectionPools::TimeoutError`. Connections past their `ttl`, or opened before `close`, are closed at checkout or check-in; a connection whose block raised is closed instead of returned. Sockets are opened and closed outside the lock. Uses a monotonic clock, injectable for specs.
 - **Connection**: a started `Net::HTTP` with `opened_at`/`last_used_at`. `Net::HTTP` itself reopens the socket when the server has closed it or it sat idle past `keep_alive_timeout`, and retries idempotent requests once on a stale connection.
 
-### 8. RouteValueValidator Module
+### 8. HTTP2 Module
+
+Opt-in HTTP/2, built on the `http-2` gem (framing, HPACK, flow control), which is loaded when a class includes the module and isn't a runtime dependency. Including it (after `Router`, and after `ConnectionPools`, whose `included` hook rejects the other order) overrides `with_http_connection`: for https it asks the class's `ConnectionSet` for a connection and yields it, and otherwise (http, or an HTTP/1.1-only origin) calls `super`, which is `ConnectionPools` or `Net::HTTP.start`. The yielded `Connection` answers `request(net_request) { |response| }` like `Net::HTTP`, so `NetHTTP::Request` doesn't change. `close_connections` closes the set and calls `super` when `ConnectionPools` is included.
+
+- **ConnectionSet**: stored on the class with `redefine_class_method(:http2_connections, ...)`. One `Connection` per host, port and connection options, replaced once it stops taking streams; origins whose server chose HTTP/1.1 during ALPN are remembered (until `close`). Fork-aware like `PoolSet`. Opens connections while holding its lock.
+- **TLSSocket**: `Socket.tcp` plus an `SSLSocket` offering `h2` and `http/1.1`, configured from `Net::HTTP`'s SSL connection options (`set_params`, so `VERIFY_PEER` by default), with SNI for host names, a non-blocking handshake bounded by `open_timeout` (`Net::OpenTimeout`), and `post_connection_check` under the same rule as `Net::HTTP`.
+- **Connection**: owns the socket and an `HTTP2::Client`. A reader thread reads the socket and feeds the client under the connection's mutex; every other call into the client (and so every write) also holds it. Each request opens a stream (waiting on a `ConditionVariable` while the server's `MAX_CONCURRENT_STREAMS` is reached), sends headers and body, and waits on its `Exchange`. On GOAWAY, streams above the last processed id fail with `StreamRefused` and the rest finish; the socket closes when the last stream does. A read failure fails every stream (`ConnectionLost`, or `ProtocolError` for protocol violations); the first error sticks. A request that raises or times out resets its stream.
+- **Exchange**: a `Thread::Queue` of one stream's events (headers, data, close) or a connection failure, popped with `read_timeout` (`Net::ReadTimeout`). Skips 1xx headers and ignores trailers; maps `REFUSED_STREAM` to `StreamRefused` and other resets to `StreamError`.
+- **RequestHeaders / ResponseBuilder / ResponseBody**: translate between `Net::HTTP` objects and HTTP/2. Requests get pseudo-headers (`Host` becomes `:authority`), lose connection-specific headers and gain `content-length` for a body. Responses are the `Net::HTTPResponse` subclass for the status (`http_version` `'2.0'`, empty message) extended with `ResponseBody`, whose `read_body` follows `Net::HTTP`'s rules (string, buffer or block, once; nil for HEAD/204/304) and inflates gzip/deflate when `decode_content` is set.
+
+### 9. RouteValueValidator Module
 
 `generate_route_code` calls `RouteValueValidator.validate!(route_name, :query/:body, value)` before generating anything. Values are compiled into the generated source, so only `String`, `Integer`, finite `Float`, `true`, `false`, `nil`, argument symbols (valid identifiers) and `Hash`/`Array` of those are allowed; anything else raises `ArgumentError` naming the route, the location and the value's class. Symbol keys that aren't identifiers are written as `:"content-type" =>`.
 
-### 9. QueryParams Class
+### 10. QueryParams Class
 
 Standalone query parameter builder (the default `query_builder` when `Hash#to_query` is unavailable, and the `:query_params` builder option):
 
@@ -178,7 +197,7 @@ Standalone query parameter builder (the default `query_builder` when `Hash#to_qu
 - Configurable separators: `name_value_separator` (default `=`), `param_separator` (default `&`)
 - Supports custom escape proc
 
-### 10. ActiveSupport Integration
+### 11. ActiveSupport Integration
 
 **ActiveSupportNotifications** (included when `ActiveSupport` is defined at the time a class includes `Router`):
 - Overrides `instrument_request` to use `ActiveSupport::Notifications.instrument`
@@ -242,11 +261,12 @@ end
 ## Error Handling
 
 - `ClientApiBuilder::Error`: Base error class
+- `ClientApiBuilder::RetryableError`: Raised by a transport for failures that are safe to retry (`HTTP2::StreamRefused`, `HTTP2::ConnectionLost`)
 - `ClientApiBuilder::UnexpectedResponse`: Raised when response code doesn't match expected codes
   - Stores `response` for inspection
   - Also raised for response bodies that aren't valid JSON
 - Response procs: Per-route custom response handling stored in `default_options[:response_procs]`; a block passed to the call takes precedence. `route` always records its block (nil clears it), so redefining a route without a block drops the previous or inherited one
-- Retry on exception: `retry_request?` returns true only for network errors (`Net::OpenTimeout`, `Net::ReadTimeout`, `Errno::ECONNRESET`, `Errno::ECONNREFUSED`, `Errno::ETIMEDOUT`, `SocketError`, `EOFError`); override to customize
+- Retry on exception: `retry_request?` returns true only for network errors (`Net::OpenTimeout`, `Net::ReadTimeout`, `Errno::ECONNRESET`, `Errno::ECONNREFUSED`, `Errno::ETIMEDOUT`, `SocketError`, `EOFError`) and `RetryableError`; override to customize
 - Retries count total attempts: `configure_retries 3` makes at most 3 attempts, and the default of 1 means no retries
 - The sleep before retry n is `sleep * backoff**(n - 1)`, capped at `max_sleep`; the default `backoff` of 1 keeps it fixed. `apply_retry_jitter` then shortens it by a random amount (`jitter: true` up to all of it, a number up to that fraction)
 
@@ -270,7 +290,8 @@ route :download, '/file', stream: true     # alias for :file
 - `net/http`: HTTP request handling (stdlib)
 - `cgi`: URL encoding in QueryParams (stdlib)
 - `active_support` (optional): Enhanced query building and instrumentation
+- `http-2` (optional): HTTP/2 protocol implementation for `ClientApiBuilder::HTTP2`
 
 ## Thread Safety
 
-The namespace stack used while defining routes is thread-local. Clients themselves are not thread-safe. Each client instance maintains state (`@response`, `@request_options`, etc.) that would cause race conditions if shared across threads. Create separate client instances per thread. With `ConnectionPools`, those instances share the class's thread-safe pools.
+The namespace stack used while defining routes is thread-local. Clients themselves are not thread-safe. Each client instance maintains state (`@response`, `@request_options`, etc.) that would cause race conditions if shared across threads. Create separate client instances per thread. With `ConnectionPools`, those instances share the class's thread-safe pools; with `HTTP2`, they share its connections, whose streams are safe to use from many threads at once.

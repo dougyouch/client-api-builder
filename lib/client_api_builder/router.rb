@@ -691,7 +691,7 @@ module ClientApiBuilder
     def retry_request?(exception, _options)
       case exception
       when Net::OpenTimeout, Net::ReadTimeout, Errno::ECONNRESET,
-           Errno::ECONNREFUSED, Errno::ETIMEDOUT, SocketError, EOFError
+           Errno::ECONNREFUSED, Errno::ETIMEDOUT, SocketError, EOFError, ::ClientApiBuilder::RetryableError
         true
       else
         false

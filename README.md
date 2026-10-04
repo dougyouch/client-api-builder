@@ -16,6 +16,7 @@ A Ruby gem for building robust, secure API clients through declarative configura
 - **Nested Routing** - Organize complex APIs with hierarchical route structures
 - **Retry Logic** - Configurable automatic retries for transient network failures
 - **Connection Pooling** - Opt-in persistent connections shared across threads, with no extra gems
+- **HTTP/2** - Opt-in HTTP/2 over TLS, multiplexing concurrent requests on one connection per host (with the `http-2` gem)
 - **Streaming Support** - Handle large payloads efficiently with streaming to files or IO
 - **ActiveSupport Integration** - Optional logging and instrumentation
 - **Comprehensive Error Handling** - Detailed error information for debugging
@@ -398,6 +399,35 @@ The pools live on the class, like ActiveRecord's, so every instance shares them:
 - `MyApiClient.close_connections` closes idle connections now and in-use ones when they're returned, including the pools of sections that have their own.
 
 Pooling uses only `Net::HTTP` from the standard library.
+
+### HTTP/2
+
+Include `ClientApiBuilder::HTTP2` (after `Router`, and after `ConnectionPools` if you use both) to send https requests over HTTP/2. It needs the [`http-2`](https://rubygems.org/gems/http-2) gem, which isn't installed with this one:
+
+```ruby
+# Gemfile
+gem 'http-2'
+```
+
+```ruby
+class MyApiClient
+  include ClientApiBuilder::Router
+  include ClientApiBuilder::ConnectionPools # optional: used for servers that only speak HTTP/1.1
+  include ClientApiBuilder::HTTP2
+
+  base_url 'https://api.example.com'
+end
+```
+
+Every instance of the class shares one connection per host (and connection options), and concurrent requests from different threads travel over it as separate streams. Responses are ordinary `Net::HTTPResponse` objects with `http_version` `'2.0'`, so `handle_response`, `UnexpectedResponse#response` and streaming routes work unchanged.
+
+- The protocol is negotiated during the TLS handshake (ALPN). When a server picks HTTP/1.1, that host is remembered and its requests go through `Net::HTTP`, or the connection pools if the class includes `ConnectionPools`. `http://` URLs always use HTTP/1.1.
+- The usual connection options apply: `open_timeout`, `read_timeout` (per response header and body chunk), and the SSL options (`verify_mode`, `ca_file`, `cert_store`, `cert`, `key`, ...). Proxies aren't supported.
+- When the server's limit on concurrent streams is reached, a request waits up to `read_timeout` for a stream to free up.
+- Gzip and deflate responses are inflated, as `Net::HTTP` does, unless you set `Accept-Encoding` yourself.
+- A stream the server refused, or never processed before closing the connection (GOAWAY), raises `ClientApiBuilder::HTTP2::StreamRefused`; a dropped connection raises `ClientApiBuilder::HTTP2::ConnectionLost`. Both are retried by `configure_retries`. A stream the server reset raises `ClientApiBuilder::HTTP2::StreamError`.
+- Response data is acknowledged to the server as it arrives, so a streaming consumer slower than the server buffers the difference in memory.
+- Sections use their root client's connections. After a fork, the child opens its own. `MyApiClient.close_connections` closes the HTTP/2 connections (and the pools).
 
 ### Retry Configuration
 

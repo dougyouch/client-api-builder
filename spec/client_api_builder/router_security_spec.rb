@@ -140,6 +140,10 @@ describe ClientApiBuilder::Router do
       expect(router.retry_request?(EOFError.new, {})).to be true
     end
 
+    it 'returns true for errors a transport marks as retryable' do
+      expect(router.retry_request?(ClientApiBuilder::RetryableError.new, {})).to be true
+    end
+
     it 'returns false for standard errors' do
       expect(router.retry_request?(StandardError.new, {})).to be false
       expect(router.retry_request?(RuntimeError.new, {})).to be false
