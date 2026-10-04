@@ -33,6 +33,13 @@ describe ClientApiBuilder::Section do
       expect(client.users).to be_a(client_class.users_router)
     end
 
+    it 'lists section router classes by name, including inherited ones' do
+      subclass = Class.new(client_class) { section(:accounts) { nil } }
+
+      expect(client_class.section_routers).to eq(users: client_class.users_router)
+      expect(subclass.section_routers).to eq(users: client_class.users_router, accounts: subclass.accounts_router)
+    end
+
     it 'memoizes the section router per client instance' do
       users = client.users
 

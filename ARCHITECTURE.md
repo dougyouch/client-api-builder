@@ -16,6 +16,12 @@ lib/
     ├── nested_router.rb               # NestedRouter class for hierarchical APIs
     ├── section.rb                     # Section module for creating nested routers
     ├── net_http_request.rb            # Net::HTTP request execution and streaming
+    ├── connection_pools.rb            # Opt-in persistent connections (class-level pools)
+    ├── connection_pools/
+    │   ├── settings.rb                # Validated pool settings and defaults
+    │   ├── pool_set.rb                # A class's pools, one per host and connection options
+    │   ├── pool.rb                    # Thread-safe pool of connections to one host
+    │   └── connection.rb              # A started Net::HTTP session with opened/last-used times
     ├── query_params.rb                # Custom query parameter builder
     ├── route_value_validator.rb       # Checks route query/body values can be compiled
     ├── active_support_notifications.rb # ActiveSupport instrumentation
@@ -142,16 +148,27 @@ Provides HTTP request execution using Net::HTTP:
 - `stream_to_io(..., io:, validate_response: nil)` - Writes streamed chunks to an IO object
 - `stream_to_file(..., file:, validate_response: nil)` - Opens the file once the response is accepted and streams to it
 
+Every request gets its `Net::HTTP` session from `with_http_connection(uri, connection_options)`. By default it wraps `Net::HTTP.start` with a block, so each request opens and closes a connection. It's the one place a different transport, or connection reuse, plugs in.
+
 `validate_response` is a callable run with the response before any of the body is read; it rejects the response by raising. The rejected body is read into `response.body` so the error can show it. Streaming routes pass `->(response) { expected_response_code!(response, codes, __options__) }`, so streaming follows the same status rules (and any `expected_response_code!` override) as other routes.
 
 **Supported HTTP Methods** (via `METHOD_TO_NET_HTTP_CLASS`):
 `copy`, `delete`, `get`, `head`, `lock`, `mkcol`, `move`, `options`, `patch`, `post`, `propfind`, `proppatch`, `put`, `trace`, `unlock`
 
-### 7. RouteValueValidator Module
+### 7. ConnectionPools Module
+
+Opt-in persistent connections. Including it (after `Router`) overrides `with_http_connection` to check a connection out of the class's pools for the length of one request, and adds `connection_pool(**settings)` and `close_connections` to the class. `NestedRouter#with_http_connection` delegates to the root client, so sections use the root's pools whether or not it has them. `NestedRouter.connection_pool` lets a section have its own: it includes `ConnectionPools` into the section class (ahead of `NestedRouter`, so its `with_http_connection` and `connection_pool` take over) and then configures it. `close_connections` also walks `section_routers` (recorded by `Section.section`), so the root closes section pools at any depth.
+
+- **Settings**: `Data` value with defaults (`max_connections: 5`, `ttl: 30`, `checkout_timeout: 5`, `idle_timeout: 2`), validated on creation.
+- **PoolSet**: stored on the class with `redefine_class_method(:connection_pools, ...)`, so subclasses share it until they configure their own. Creates one `Pool` per scheme, host, port and connection options, passing `idle_timeout` as `Net::HTTP`'s `keep_alive_timeout` unless a connection option sets it. Records `Process.pid` and starts with no pools in a forked child, dropping the parent's connections without closing them.
+- **Pool**: a `Mutex` and `ConditionVariable` around a stack of idle connections and a count of open ones. Checkout reuses the most recently returned connection, opens a new one if under `max_connections`, or waits up to `checkout_timeout` and raises `ConnectionPools::TimeoutError`. Connections past their `ttl`, or opened before `close`, are closed at checkout or check-in; a connection whose block raised is closed instead of returned. Sockets are opened and closed outside the lock. Uses a monotonic clock, injectable for specs.
+- **Connection**: a started `Net::HTTP` with `opened_at`/`last_used_at`. `Net::HTTP` itself reopens the socket when the server has closed it or it sat idle past `keep_alive_timeout`, and retries idempotent requests once on a stale connection.
+
+### 8. RouteValueValidator Module
 
 `generate_route_code` calls `RouteValueValidator.validate!(route_name, :query/:body, value)` before generating anything. Values are compiled into the generated source, so only `String`, `Integer`, finite `Float`, `true`, `false`, `nil`, argument symbols (valid identifiers) and `Hash`/`Array` of those are allowed; anything else raises `ArgumentError` naming the route, the location and the value's class. Symbol keys that aren't identifiers are written as `:"content-type" =>`.
 
-### 8. QueryParams Class
+### 9. QueryParams Class
 
 Standalone query parameter builder (the default `query_builder` when `Hash#to_query` is unavailable, and the `:query_params` builder option):
 
@@ -160,7 +177,7 @@ Standalone query parameter builder (the default `query_builder` when `Hash#to_qu
 - Configurable separators: `name_value_separator` (default `=`), `param_separator` (default `&`)
 - Supports custom escape proc
 
-### 9. ActiveSupport Integration
+### 10. ActiveSupport Integration
 
 **ActiveSupportNotifications** (included when `ActiveSupport` is defined at the time a class includes `Router`):
 - Overrides `instrument_request` to use `ActiveSupport::Notifications.instrument`
@@ -254,4 +271,4 @@ route :download, '/file', stream: true     # alias for :file
 
 ## Thread Safety
 
-The namespace stack used while defining routes is thread-local. Clients themselves are not thread-safe. Each client instance maintains state (`@response`, `@request_options`, etc.) that would cause race conditions if shared across threads. Create separate client instances per thread.
+The namespace stack used while defining routes is thread-local. Clients themselves are not thread-safe. Each client instance maintains state (`@response`, `@request_options`, etc.) that would cause race conditions if shared across threads. Create separate client instances per thread. With `ConnectionPools`, those instances share the class's thread-safe pools.

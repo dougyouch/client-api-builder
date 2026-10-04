@@ -10,6 +10,11 @@ module ClientApiBuilder
     module ClassMethods
       SECTION_NAME = /\A[a-z_][a-z0-9_]*\z/i
 
+      # Section router classes by name, including inherited sections
+      def section_routers
+        {}.freeze
+      end
+
       # Defines <name>_router (the section's NestedRouter class) and <name> (its router for a
       # client instance) with closures, so anonymous client classes and any option values work.
       # inherit: opts the section into root client settings (see NestedRouter.inherit_from_root);
@@ -31,6 +36,7 @@ module ClientApiBuilder
         kls.class_eval(&block) if block
 
         define_singleton_method(:"#{name}_router") { kls }
+        add_value_to_class_method(:section_routers, name.to_sym => kls)
         define_section_accessor(name, nested_router_options)
       end
 
