@@ -2,7 +2,7 @@ PATH
   remote: .
   specs:
     client-api-builder (0.11.0)
-      inheritance-helper (>= 0.2.5)
+      inheritance-helper (>= 1.0, < 2)
 
 GEM
   remote: https://rubygems.org/
@@ -36,7 +36,7 @@ GEM
     http-2 (1.2.3)
     i18n (1.15.2)
       concurrent-ruby (~> 1.0)
-    inheritance-helper (0.2.5)
+    inheritance-helper (1.0.0)
     json (3.0.2)
     language_server-protocol (3.17.0.6)
     lint_roller (1.1.0)
@@ -131,7 +131,7 @@ CHECKSUMS
   hashdiff (1.2.1) sha256=9c079dbc513dfc8833ab59c0c2d8f230fa28499cc5efb4b8dd276cf931457cd1
   http-2 (1.2.3) sha256=f4e3a7000e9a8ab97595f09eac44c6ec10a2aa438360758124df0ca5bcb280d4
   i18n (1.15.2) sha256=00f9eb62412fe593b2a65a97daa75300d37abb8f7202ec748e94b6d46a9dd1b5
-  inheritance-helper (0.2.5) sha256=e318d548d2e201910ab484b2139a11e61f3dfac012c4aba090bcfaa5f9687b85
+  inheritance-helper (1.0.0) sha256=e9dca1795457276545cefbf9ad62b734ed7ae567d43c2d900a9472b04e8b17f3
   json (3.0.2) sha256=8e6d7e7b11384c21230430cef90b71f14849a34a1f4452796670f7c981bd19df
   language_server-protocol (3.17.0.6) sha256=5ef2c0c138f8267e1bc631d3328347d354f96724b0af22f2c79516120443b7f0
   lint_roller (1.1.0) sha256=2c0c845b632a7d172cb849cc90c1bce937a28c5c8ccccb50dfd46a485003cc87

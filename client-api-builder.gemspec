@@ -19,7 +19,7 @@ Gem::Specification.new do |s|
 
   s.required_ruby_version = '>= 3.2'
 
-  s.add_dependency 'inheritance-helper', '>= 0.2.5'
+  s.add_dependency 'inheritance-helper', '>= 1.0', '< 2'
 
   s.metadata = {
     'rubygems_mfa_required' => 'true',
