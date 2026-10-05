@@ -8,7 +8,7 @@ Client API Builder is a Ruby gem for creating API clients through declarative co
 
 ## Common Commands
 
-Development uses the Ruby in `.ruby-version` (4.0.x), which `Gemfile.lock` is resolved against. The gem itself supports Ruby 3.2+ (`required_ruby_version` and RuboCop's `TargetRubyVersion`).
+Development uses the Ruby in `.ruby-version` (4.0.x), which `Gemfile.lock` is resolved against. The gem itself supports Ruby 3.3+ (`required_ruby_version` and RuboCop's `TargetRubyVersion`), and CI runs the specs on 3.3 as well.
 
 ```bash
 # Install dependencies

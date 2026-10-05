@@ -827,7 +827,7 @@ Define these in your client to change default behavior:
 
 ## Requirements
 
-- Ruby 3.2+
+- Ruby 3.3+
 - `inheritance-helper` gem (>= 0.2.5)
 - `activesupport` (optional) for `to_query` builders and instrumentation
 

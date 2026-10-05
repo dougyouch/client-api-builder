@@ -17,7 +17,7 @@ Gem::Specification.new do |s|
   s.homepage    = 'https://github.com/dougyouch/client-api-builder'
   s.files       = Dir.glob('lib/**/*.rb') + %w[README.md LICENSE CHANGELOG.md]
 
-  s.required_ruby_version = '>= 3.2'
+  s.required_ruby_version = '>= 3.3'
 
   s.add_dependency 'inheritance-helper', '>= 1.0', '< 2'
 
