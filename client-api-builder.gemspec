@@ -15,7 +15,7 @@ Gem::Specification.new do |s|
   s.authors     = ['Doug Youch']
   s.email       = 'dougyouch@gmail.com'
   s.homepage    = 'https://github.com/dougyouch/client-api-builder'
-  s.files       = Dir.glob('lib/**/*.rb') + %w[README.md LICENSE CHANGELOG.md]
+  s.files       = Dir.glob('lib/**/*.rb') + %w[README.md UPGRADING.md LICENSE CHANGELOG.md]
 
   s.required_ruby_version = '>= 3.3'
 

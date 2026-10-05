@@ -5,6 +5,8 @@
 [![Coverage](https://raw.githubusercontent.com/dougyouch/client-api-builder/badges/coverage.svg)](https://github.com/dougyouch/client-api-builder/actions/workflows/ci.yml)
 [![Branch Coverage](https://raw.githubusercontent.com/dougyouch/client-api-builder/badges/branches.svg)](https://github.com/dougyouch/client-api-builder/actions/workflows/ci.yml)
 
+[Changelog](CHANGELOG.md) · [Upgrading to 1.0](UPGRADING.md)
+
 A Ruby gem for building robust, secure API clients through declarative configuration. Define your API endpoints and their behavior with minimal boilerplate while benefiting from built-in security features, automatic retries, and comprehensive error handling.
 
 ## Features
@@ -336,7 +338,7 @@ section :users, inherit: %i[headers query_params connection_options] do
 end
 ```
 
-Inherited settings are the root client's class-level ones, read on every request (so ones declared after the section, or in a subclass of the client, apply too). The section's own settings override them, and per-request options override both; a per-request `nil` header still drops an inherited one. Retries and body/query builders are always the section's own. Any other options passed to `section` are available to it as `nested_router_options`.
+Inherited settings are the root client's class-level ones, read on every request (so ones declared after the section, or in a subclass of the client, apply too). The section's own settings override them, and per-request options override both; a per-request `nil` header still drops an inherited one. Retries and body/query builders are always the section's own. Any other options passed to `section` are available to it as `nested_router_options`. Get a section's class with `<name>_router` (`MyApiClient.users_router`) rather than its constant name; see [UPGRADING.md](UPGRADING.md#section-class-names-are-no-longer-singularized).
 
 Symbol and block values given to `header` and `query_param`, `{name}` path values, and response blocks are evaluated on the root client, so they can use its methods and state.
 
@@ -828,7 +830,7 @@ Define these in your client to change default behavior:
 ## Requirements
 
 - Ruby 3.3+
-- `inheritance-helper` gem (>= 0.2.5)
+- `inheritance-helper` gem (1.x)
 - `activesupport` (optional) for `to_query` builders and instrumentation
 
 ## Contributing
