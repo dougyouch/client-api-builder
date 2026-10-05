@@ -33,6 +33,20 @@ describe ClientApiBuilder::Section do
       expect(client.users).to be_a(client_class.users_router)
     end
 
+    # String#classify (from ActiveSupport) used to singularize the names, so :users and :user
+    # both became UserNestedRouter; inheritance-helper 1.x no longer uses classify
+    it 'names section classes after the section, even with ActiveSupport inflections loaded' do
+      require 'active_support/core_ext/string/inflections'
+      named_class = stub_const('NamedClient', Class.new { include ClientApiBuilder::Router })
+      named_class.section(:users) { nil }
+      named_class.section(:user) { nil }
+      named_class.section(:news_items) { nil }
+
+      expect(named_class.users_router.name).to eq('NamedClient::UsersNestedRouter')
+      expect(named_class.user_router.name).to eq('NamedClient::UserNestedRouter')
+      expect(named_class.news_items_router.name).to eq('NamedClient::NewsItemsNestedRouter')
+    end
+
     it 'lists section router classes by name, including inherited ones' do
       subclass = Class.new(client_class) { section(:accounts) { nil } }
 
