@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.0.0](https://github.com/dougyouch/client-api-builder/compare/v0.11.0...v1.0.0) (2026-10-05)
+
+
+### ⚠ BREAKING CHANGES
+
+* **gem:** Ruby 3.2 reached end of life in March 2026 and is no longer supported. CI now also runs the specs on Ruby 3.3, the minimum, with Gemfile.lock and the coverage gate.
+* **deps:** section router classes are named after the section even when ActiveSupport is loaded. inheritance-helper 0.2 used String#classify there, so section :users created UserNestedRouter and collided with section :user; it is now UsersNestedRouter. Use <name>_router rather than the constant name.
+
+### Build System
+
+* **deps:** require inheritance-helper 1.x ([60525c4](https://github.com/dougyouch/client-api-builder/commit/60525c4e21d1eb202f7f49ebf246c057bc9a6cb6))
+* **gem:** require ruby 3.3 ([a6f79da](https://github.com/dougyouch/client-api-builder/commit/a6f79da0abb0986e711fce17f7f6428b7a1b73e1))
+
 ## [0.11.0](https://github.com/dougyouch/client-api-builder/compare/v0.10.0...v0.11.0) (2026-10-04)
 
 
