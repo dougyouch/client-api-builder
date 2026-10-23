@@ -1,5 +1,55 @@
 # Upgrading
 
+## From 1.0 to 1.1: transports (optional)
+
+1.1 has no breaking changes. Clients that include `ClientApiBuilder::ConnectionPools`, `ThreadConnections` or `HTTP2`
+keep working as before, with the same `connection_pool`, `connection_per_thread` and `close_connections` class methods.
+
+What's new is that how requests reach the network can be chosen per environment at boot, with
+[transports](README.md#transports), instead of only in the client class. Move to them when one client class needs
+different connection handling in different processes, for example a connection per request in a web server and
+persistent connections in a background worker.
+
+Before, the class decided for every process:
+
+```ruby
+class GitHubClient
+  include ClientApiBuilder::Router
+  include ClientApiBuilder::ThreadConnections
+
+  base_url 'https://api.github.com'
+  connection_per_thread ttl: 30
+end
+```
+
+After, the class describes the API and each process picks its transport:
+
+```ruby
+class GitHubClient
+  include ClientApiBuilder::Router
+
+  base_url 'https://api.github.com'
+end
+
+# Sidekiq boot code; the web server keeps the default, a new connection per request
+ClientApiBuilder.use_transport(ClientApiBuilder::Transports::ThreadLocal.new(ttl: 30), GitHubClient)
+at_exit { ClientApiBuilder.close_transports }
+```
+
+You can also keep the `include` as the class's default and override it only where needed: a transport registered for
+the class with `use_transport` wins over the one it includes, whether it's registered before or after the class loads.
+
+| Include style | Transport |
+|---|---|
+| `include ClientApiBuilder::ConnectionPools` + `connection_pool(**settings)` | `Transports::Pooled.new(**settings)` |
+| `include ClientApiBuilder::ThreadConnections` + `connection_per_thread(**settings)` | `Transports::ThreadLocal.new(**settings)` |
+| `include ClientApiBuilder::HTTP2` | `Transports::HTTP2.new` |
+| `include ClientApiBuilder::ConnectionPools` + `include ClientApiBuilder::HTTP2` | `Transports::HTTP2.new(fallback: Transports::Pooled.new)` |
+| `MyClient.close_connections` | `transport.close`, or `ClientApiBuilder.close_transports` for all of them |
+
+One behaviour to know: if your client overrides `with_http_connection`, the override still runs and still takes
+precedence over every transport.
+
 ## From 0.11 to 1.0
 
 1.0 has two breaking changes. Most clients need no code changes; check whether these apply to you.
