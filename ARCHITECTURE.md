@@ -16,6 +16,14 @@ lib/
     ├── nested_router.rb               # NestedRouter class for hierarchical APIs
     ├── section.rb                     # Section module for creating nested routers
     ├── net_http_request.rb            # Net::HTTP request execution and streaming
+    ├── transports.rb                  # How requests reach the network, chosen per environment
+    ├── transports/
+    │   ├── registry.rb                # Which transport each client class uses, plus the default
+    │   ├── one_shot.rb                # A new Net::HTTP connection per request (the default)
+    │   ├── pooled.rb                  # Pools shared by every thread (wraps ConnectionPools::PoolSet)
+    │   ├── thread_local.rb            # Connections per thread (wraps ThreadConnections::ConnectionSet)
+    │   └── http2.rb                   # HTTP/2 for https, with an HTTP/1.1 fallback transport
+    ├── declared_transport.rb          # Class methods the mixins below use to declare a class's transport
     ├── connection_pools.rb            # Opt-in persistent connections (class-level pools)
     ├── connection_pools/
     │   ├── settings.rb                # Validated pool settings and defaults
@@ -162,44 +170,54 @@ Provides HTTP request execution using Net::HTTP:
 - `stream_to_io(..., io:, validate_response: nil)` - Writes streamed chunks to an IO object
 - `stream_to_file(..., file:, validate_response: nil)` - Opens the file once the response is accepted and streams to it
 
-Every request gets its `Net::HTTP` session from `with_http_connection(uri, connection_options)`. By default it wraps `Net::HTTP.start` with a block, so each request opens and closes a connection. It's the one place a different transport, or connection reuse, plugs in.
+Every request gets its `Net::HTTP` session from `with_http_connection(uri, connection_options)`, which delegates to `transport.with_connection` (see Transports). `transport` is the one set with `transport=`, else the registry's for the class; `NestedRouter#transport` falls back to `root_router.transport` instead of the process default. `with_http_connection` stays the seam a client can override.
 
 `validate_response` is a callable run with the response before any of the body is read; it rejects the response by raising. The rejected body is read into `response.body` so the error can show it. Streaming routes pass `->(response) { expected_response_code!(response, codes, __options__) }`, so streaming follows the same status rules (and any `expected_response_code!` override) as other routes.
 
 **Supported HTTP Methods** (via `METHOD_TO_NET_HTTP_CLASS`):
 `copy`, `delete`, `get`, `head`, `lock`, `mkcol`, `move`, `options`, `patch`, `post`, `propfind`, `proppatch`, `put`, `trace`, `unlock`
 
-### 7. ConnectionPools Module
+### 7. Transports
 
-Opt-in persistent connections. Including it (after `Router`) overrides `with_http_connection` to check a connection out of the class's pools for the length of one request, and adds `connection_pool(**settings)` and `close_connections` to the class. `NestedRouter#with_http_connection` delegates to the root client, so sections use the root's pools whether or not it has them. `NestedRouter.connection_pool` lets a section have its own: it includes `ConnectionPools` into the section class (ahead of `NestedRouter`, so its `with_http_connection` and `connection_pool` take over) and then configures it. `close_connections` also walks `section_routers` (recorded by `Section.section`), so the root closes section pools at any depth.
+A transport owns connections and sends requests: `with_connection(uri, connection_options) { |http| }` yields something answering `request(net_request) { |response| }` like a started `Net::HTTP`, and `close` closes its connections. The concrete ones are thin wrappers over the connection code below, which is where fork safety and closing a connection whose request raised live:
+
+- **OneShot**: `Net::HTTP.start` with the block, so each request opens and closes a connection. `close` is a no-op.
+- **Pooled**: holds a `ConnectionPools::PoolSet` (`pool_set`) built from `ConnectionPools::Settings`.
+- **ThreadLocal**: holds a `ThreadConnections::ConnectionSet` (`connection_set`) built from `ThreadConnections::Settings`.
+- **HTTP2**: holds an `HTTP2::ConnectionSet` (`connections`) and a `fallback` transport (default `OneShot`). https requests to an origin that negotiated h2 get the HTTP/2 `Connection`; http requests and HTTP/1.1-only origins go to the fallback. `with_fallback(t)` returns a transport over the same HTTP/2 connections with another fallback. `close` closes both. Requires the `http-2` gem on construction.
+- **Registry**: one per process, `ClientApiBuilder.transports`; `ClientApiBuilder.use_transport` and `close_transports` call it. Two `ObjectSpace::WeakKeyMap`s keyed by class or module (so anonymous classes can be collected): *registered* (`use`, the environment's choice) and *declared* (`declare`, from a class body's mixins). `registered_for(klass)` walks `klass.ancestors` for the nearest registered entry, then for the nearest declared one, so `use_transport` for a class wins whether it ran before or after the class body. `for_class` falls back to the default, created lazily (`OneShot`) unless `use(transport)` set one. Every transport it has seen is kept in an `ObjectSpace::WeakMap` so `close_all` can close them. `reset` forgets registrations and the default but keeps declarations; it's for specs. All access is under one mutex.
+
+### 8. ConnectionPools Module
+
+The include style for `Transports::Pooled`: it makes pools the class's declared transport. Including it (after `Router`) extends `DeclaredTransport` and adds `connection_pool(**settings)`, `connection_pools` and `close_connections` to the class. `connection_pool` stores a new `Transports::Pooled` with `redefine_class_method(:http1_transport, ...)`, so subclasses share it until they configure their own, and calls `declare_transport`, which registers it (or, with `HTTP2`, `http2_transport.with_fallback(http1_transport)`) as the class's declared transport. `connection_pools` returns its `pool_set`. Sections use the root's transport whether or not it has pools. `NestedRouter.connection_pool` lets a section have its own: it includes `ConnectionPools` into the section class and then configures it, so the section class has a declared transport of its own. `close_connections` also walks `section_routers` (recorded by `Section.section`), so the root closes section pools at any depth.
 
 - **Settings**: `Data` value with defaults (`max_connections: 5`, `ttl: 30`, `checkout_timeout: 5`, `idle_timeout: 2`), validated on creation.
-- **PoolSet**: stored on the class with `redefine_class_method(:connection_pools, ...)`, so subclasses share it until they configure their own. Creates one `Pool` per scheme, host, port and connection options, passing `idle_timeout` as `Net::HTTP`'s `keep_alive_timeout` unless a connection option sets it. Records `Process.pid` and starts with no pools in a forked child, dropping the parent's connections without closing them.
+- **PoolSet**: held by `Transports::Pooled`. Creates one `Pool` per scheme, host, port and connection options, passing `idle_timeout` as `Net::HTTP`'s `keep_alive_timeout` unless a connection option sets it. Records `Process.pid` and starts with no pools in a forked child, dropping the parent's connections without closing them.
 - **Pool**: a `Mutex` and `ConditionVariable` around a stack of idle connections and a count of open ones. Checkout reuses the most recently returned connection, opens a new one if under `max_connections`, or waits up to `checkout_timeout` and raises `ConnectionPools::TimeoutError`. Connections past their `ttl`, or opened before `close`, are closed at checkout or check-in; a connection whose block raised is closed instead of returned. Sockets are opened and closed outside the lock. Uses a monotonic clock, injectable for specs.
 - **Connection**: a started `Net::HTTP` with `opened_at`/`last_used_at`. `Net::HTTP` itself reopens the socket when the server has closed it or it sat idle past `keep_alive_timeout`, and retries idempotent requests once on a stale connection.
 
-### 8. ThreadConnections Module
+### 9. ThreadConnections Module
 
-The alternative to `ConnectionPools` for a fixed set of worker threads: each thread keeps its own connections, so there's no size limit, waiting or checkout timeout. Including it (after `Router`; its `included` hook rejects `ConnectionPools` in the same class, and `ConnectionPools` rejects it) overrides `with_http_connection` to use the class's `ConnectionSet`, and adds `connection_per_thread(**settings)` and `close_connections`. Sections and subclasses work as with the pools: `NestedRouter.connection_per_thread` includes the module into the section class, and `close_connections` walks `section_routers`.
+The alternative to `ConnectionPools` for a fixed set of worker threads: each thread keeps its own connections, so there's no size limit, waiting or checkout timeout. Including it (after `Router`; its `included` hook rejects `ConnectionPools` in the same class, and `ConnectionPools` rejects it) declares a `Transports::ThreadLocal` the same way (`connection_per_thread(**settings)` stores it as `http1_transport`; `thread_connections` returns its `connection_set`), and adds `close_connections`. Sections and subclasses work as with the pools: `NestedRouter.connection_per_thread` includes the module into the section class, and `close_connections` walks `section_routers`.
 
 - **Settings**: `Data` value (`ttl: 30`, `idle_timeout: 2`), validated on creation.
-- **ConnectionSet**: stored with `redefine_class_method(:thread_connections, ...)`. A hash of `Thread => { [scheme, host, port, connection options] => ConnectionPools::Connection }` under one mutex, held only to take or put back a connection. A request takes the thread's connection out of the hash and puts it back afterwards, so a request made while it's out (re-entrant, or another fiber) opens its own, and the second one back is closed. Expired connections, those opened before `close`, and those whose block raised are closed instead of kept. A thread's first request sweeps out dead threads and closes their connections. Fork-aware like `PoolSet`; monotonic clock injectable for specs.
+- **ConnectionSet**: held by `Transports::ThreadLocal`. A hash of `Thread => { [scheme, host, port, connection options] => ConnectionPools::Connection }` under one mutex, held only to take or put back a connection. A request takes the thread's connection out of the hash and puts it back afterwards, so a request made while it's out (re-entrant, or another fiber) opens its own, and the second one back is closed. Expired connections, those opened before `close`, and those whose block raised are closed instead of kept. A thread's first request sweeps out dead threads and closes their connections. Fork-aware like `PoolSet`; monotonic clock injectable for specs.
 
-### 9. HTTP2 Module
+### 10. HTTP2 Module
 
-Opt-in HTTP/2, built on the `http-2` gem (framing, HPACK, flow control), which is loaded when a class includes the module and isn't a runtime dependency. Including it (after `Router`, and after `ConnectionPools` or `ThreadConnections`, whose `included` hooks reject the other order) overrides `with_http_connection`: for https it asks the class's `ConnectionSet` for a connection and yields it, and otherwise (http, or an HTTP/1.1-only origin) calls `super`, which is `ConnectionPools`, `ThreadConnections` or `Net::HTTP.start`. The yielded `Connection` answers `request(net_request) { |response| }` like `Net::HTTP`, so `NetHTTP::Request` doesn't change. `close_connections` closes the set and calls `super` when `ConnectionPools` or `ThreadConnections` is included.
+Opt-in HTTP/2, built on the `http-2` gem (framing, HPACK, flow control), which is loaded when a class includes the module and isn't a runtime dependency. Including it (after `Router`, and after `ConnectionPools` or `ThreadConnections`, whose `included` hooks reject the other order) stores a `Transports::HTTP2` as the class's `http2_transport` and declares it with the class's `http1_transport` (`ConnectionPools`, `ThreadConnections` or `OneShot`) as the fallback; `http2_connections` returns its `connections`. A subclass that calls `connection_pool` or `connection_per_thread` declares the same HTTP/2 connections with its new fallback. The yielded `Connection` answers `request(net_request) { |response| }` like `Net::HTTP`, so `NetHTTP::Request` doesn't change. `close_connections` closes the set and calls `super` when `ConnectionPools` or `ThreadConnections` is included.
 
-- **ConnectionSet**: stored on the class with `redefine_class_method(:http2_connections, ...)`. One `Connection` per host, port and connection options, replaced once it stops taking streams; origins whose server chose HTTP/1.1 during ALPN are remembered (until `close`). Fork-aware like `PoolSet`. Opens connections while holding its lock.
+- **ConnectionSet**: held by `Transports::HTTP2`. One `Connection` per host, port and connection options, replaced once it stops taking streams; origins whose server chose HTTP/1.1 during ALPN are remembered (until `close`). Fork-aware like `PoolSet`. Opens connections while holding its lock.
 - **TLSSocket**: `Socket.tcp` plus an `SSLSocket` offering `h2` and `http/1.1`, configured from `Net::HTTP`'s SSL connection options (`set_params`, so `VERIFY_PEER` by default), with SNI for host names, a non-blocking handshake bounded by `open_timeout` (`Net::OpenTimeout`), and `post_connection_check` under the same rule as `Net::HTTP`.
 - **Connection**: owns the socket and an `HTTP2::Client`. A reader thread reads the socket and feeds the client under the connection's mutex; every other call into the client (and so every write) also holds it. Each request opens a stream (waiting on a `ConditionVariable` while the server's `MAX_CONCURRENT_STREAMS` is reached), sends headers and body, and waits on its `Exchange`. On GOAWAY, streams above the last processed id fail with `StreamRefused` and the rest finish; the socket closes when the last stream does. A read failure fails every stream (`ConnectionLost`, or `ProtocolError` for protocol violations); the first error sticks. A request that raises or times out resets its stream.
 - **Exchange**: a `Thread::Queue` of one stream's events (headers, data, close) or a connection failure, popped with `read_timeout` (`Net::ReadTimeout`). Skips 1xx headers and ignores trailers; maps `REFUSED_STREAM` to `StreamRefused` and other resets to `StreamError`.
 - **RequestHeaders / ResponseBuilder / ResponseBody**: translate between `Net::HTTP` objects and HTTP/2. Requests get pseudo-headers (`Host` becomes `:authority`), lose connection-specific headers and gain `content-length` for a body. Responses are the `Net::HTTPResponse` subclass for the status (`http_version` `'2.0'`, empty message) extended with `ResponseBody`, whose `read_body` follows `Net::HTTP`'s rules (string, buffer or block, once; nil for HEAD/204/304) and inflates gzip/deflate when `decode_content` is set.
 
-### 10. RouteValueValidator Module
+### 11. RouteValueValidator Module
 
 `generate_route_code` calls `RouteValueValidator.validate!(route_name, :query/:body, value)` before generating anything. Values are compiled into the generated source, so only `String`, `Integer`, finite `Float`, `true`, `false`, `nil`, argument symbols (valid identifiers) and `Hash`/`Array` of those are allowed; anything else raises `ArgumentError` naming the route, the location and the value's class. Symbol keys that aren't identifiers are written as `:"content-type" =>`.
 
-### 11. QueryParams Class
+### 12. QueryParams Class
 
 Standalone query parameter builder (the default `query_builder` when `Hash#to_query` is unavailable, and the `:query_params` builder option):
 
@@ -208,7 +226,7 @@ Standalone query parameter builder (the default `query_builder` when `Hash#to_qu
 - Configurable separators: `name_value_separator` (default `=`), `param_separator` (default `&`)
 - Supports custom escape proc
 
-### 12. ActiveSupport Integration
+### 13. ActiveSupport Integration
 
 **ActiveSupportNotifications** (included when `ActiveSupport` is defined at the time a class includes `Router`):
 - Overrides `instrument_request` to use `ActiveSupport::Notifications.instrument`
@@ -301,8 +319,8 @@ route :download, '/file', stream: true     # alias for :file
 - `net/http`: HTTP request handling (stdlib)
 - `cgi`: URL encoding in QueryParams (stdlib)
 - `active_support` (optional): Enhanced query building and instrumentation
-- `http-2` (optional): HTTP/2 protocol implementation for `ClientApiBuilder::HTTP2`
+- `http-2` (optional): HTTP/2 protocol implementation for `ClientApiBuilder::HTTP2` and `Transports::HTTP2`
 
 ## Thread Safety
 
-The namespace stack used while defining routes is thread-local. Clients themselves are not thread-safe. Each client instance maintains state (`@response`, `@request_options`, etc.) that would cause race conditions if shared across threads. Create separate client instances per thread. With `ConnectionPools`, those instances share the class's thread-safe pools; with `ThreadConnections`, each thread's instances share that thread's connections; with `HTTP2`, they share its connections, whose streams are safe to use from many threads at once.
+The namespace stack used while defining routes is thread-local. Clients themselves are not thread-safe. Each client instance maintains state (`@response`, `@request_options`, etc.) that would cause race conditions if shared across threads. Create separate client instances per thread; transports are thread-safe and shared. With `Pooled`, those instances share its pools; with `ThreadLocal`, each thread's instances share that thread's connections; with `HTTP2`, they share its connections, whose streams are safe to use from many threads at once. The registry is meant to be set up at boot, but its reads and writes are synchronized.

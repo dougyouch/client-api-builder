@@ -17,6 +17,7 @@ A Ruby gem for building robust, secure API clients through declarative configura
 - **Flexible Request Building** - Support for JSON, query params, and custom body builders
 - **Nested Routing** - Organize complex APIs with hierarchical route structures
 - **Retry Logic** - Configurable automatic retries for transient network failures
+- **Transports** - Choose how requests reach the network per environment at boot, so one client class can open a connection per request in a web server and keep persistent connections in a worker
 - **Connection Pooling** - Opt-in persistent connections shared across threads, with no extra gems
 - **Per-Thread Connections** - Opt-in persistent connections dedicated to each thread, with no pool to size
 - **HTTP/2** - Opt-in HTTP/2 over TLS, multiplexing concurrent requests on one connection per host (with the `http-2` gem)
@@ -363,9 +364,67 @@ end
 
 Any `Net::HTTP.start` option can be set this way. Your options are applied over the secure HTTPS defaults, so setting `verify_mode` yourself replaces `VERIFY_PEER`.
 
+### Transports
+
+How requests reach the network is up to a transport, chosen for the environment at boot rather than in the client class. The same `GitHubClient` can open a connection per request inside a web server and keep per-thread connections inside a background worker:
+
+```ruby
+# config/puma.rb, or any web server's boot code: the default, shown for clarity
+ClientApiBuilder.use_transport(ClientApiBuilder::Transports::OneShot.new)
+
+# config/initializers/sidekiq.rb
+Sidekiq.configure_server do |config|
+  ClientApiBuilder.use_transport(ClientApiBuilder::Transports::ThreadLocal.new(ttl: 30))
+  config.on(:shutdown) { ClientApiBuilder.close_transports }
+end
+```
+
+| Transport | Connections | Suits |
+|---|---|---|
+| `Transports::OneShot.new` (default) | A new one per request, closed once the response is read | Web servers, forking process managers, low request rates |
+| `Transports::Pooled.new(max_connections:, ttl:, checkout_timeout:, idle_timeout:)` | Pools shared by every thread, one per scheme, host, port and connection options | Many threads, including short-lived ones ([details](#persistent-connections)) |
+| `Transports::ThreadLocal.new(ttl:, idle_timeout:)` | One per thread and host, reused by that thread's requests | A fixed set of worker threads ([details](#per-thread-connections)) |
+| `Transports::HTTP2.new(fallback: Transports::OneShot.new)` | One HTTP/2 connection per origin, carrying concurrent requests as streams | Many threads waiting on one slow https API ([details](#http2)) |
+
+Register a transport for every client, for one client class (and its subclasses), or for one client instance:
+
+```ruby
+ClientApiBuilder.use_transport(ClientApiBuilder::Transports::ThreadLocal.new)                 # every client
+ClientApiBuilder.use_transport(ClientApiBuilder::Transports::Pooled.new(max_connections: 10), GitHubClient)
+client.transport = ClientApiBuilder::Transports::OneShot.new                                  # this instance only
+
+ClientApiBuilder.close_transports # closes every registered transport's connections, e.g. at shutdown
+```
+
+A request uses the first transport it finds:
+
+1. The one set on the client instance with `transport=`.
+2. The one registered with `use_transport` for the client's class or its nearest ancestor (a module works too, for every class including it).
+3. The one the class itself includes (`ConnectionPools`, `ThreadConnections` or `HTTP2`, below), or its nearest ancestor's.
+4. For a section, its root client's transport.
+5. The process default set with `use_transport(transport)`, else `OneShot`.
+
+So a class can include a sensible default for its API, and the environment still decides: `use_transport` for the class wins whether it runs before or after the class is loaded. Sections use their root client's transport, so they share its connections, unless a transport is set or registered for the section, or it calls `connection_pool` or `connection_per_thread`.
+
+Every transport is fork-safe (after a fork, the child opens its own connections and leaves the parent's alone) and closes a connection whose request raised rather than reusing it.
+
+A transport is any object with `with_connection(uri, connection_options) { |http| ... }`, which yields something answering `request(net_request) { |response| ... }` like a started `Net::HTTP`, and `close`. `connection_options` are the `Net::HTTP.start` options, with the [secure HTTPS defaults](#connection-options) applied.
+
 ### Persistent Connections
 
-By default each request opens and closes its own connection. Include `ClientApiBuilder::ConnectionPools` (after `Router`) to keep connections open and reuse them:
+`Transports::Pooled` keeps connections open and reuses them:
+
+```ruby
+# Optional settings; these are the defaults
+ClientApiBuilder.use_transport(
+  ClientApiBuilder::Transports::Pooled.new(max_connections: 5,  # connections per host
+                                           ttl: 30,             # seconds before a connection is closed and replaced
+                                           checkout_timeout: 5, # seconds to wait for a free connection
+                                           idle_timeout: 2)     # seconds idle before Net::HTTP reconnects (keep_alive_timeout)
+)
+```
+
+Or give a client class its own pools, as its default, by including `ClientApiBuilder::ConnectionPools` (after `Router`):
 
 ```ruby
 class MyApiClient
@@ -374,21 +433,17 @@ class MyApiClient
 
   base_url 'https://api.example.com'
 
-  # Optional; these are the defaults
-  connection_pool max_connections: 5,  # connections per host
-                  ttl: 30,             # seconds before a connection is closed and replaced
-                  checkout_timeout: 5, # seconds to wait for a free connection
-                  idle_timeout: 2      # seconds idle before Net::HTTP reconnects (keep_alive_timeout)
+  connection_pool max_connections: 10, ttl: 60 # optional; takes the same settings
 end
 ```
 
-The pools live on the class, like ActiveRecord's, so every instance shares them: keep one client instance per thread and the threads share the connections. A connection is checked out for one request (or one streamed response) and returned straight after, so `max_connections` can be lower than your thread count. There is one pool per scheme, host, port and connection options.
+Every client using the transport shares its pools: keep one client instance per thread and the threads share the connections. A connection is checked out for one request (or one streamed response) and returned straight after, so `max_connections` can be lower than your thread count. There is one pool per scheme, host, port and connection options.
 
 - Sockets the server has closed, or that sat idle past `idle_timeout`, are reopened automatically.
 - A connection whose request raised is closed rather than reused.
 - When no connection frees up within `checkout_timeout`, the request raises `ClientApiBuilder::ConnectionPools::TimeoutError`.
-- Sections use their root client's pools, getting a separate pool for any other host in their `base_url`. Subclasses share their parent's pools unless they call `connection_pool` themselves.
-- A section can call `connection_pool` in its block to get its own pools and settings. This works whether or not the root client includes `ConnectionPools`:
+- With `ConnectionPools`, sections use their root client's pools, getting a separate pool for any other host in their `base_url`. Subclasses share their parent's pools unless they call `connection_pool` themselves.
+- A section can call `connection_pool` in its block to get its own pools and settings. This works whatever transport the root client uses:
 
   ```ruby
   section :uploads do
@@ -399,25 +454,20 @@ The pools live on the class, like ActiveRecord's, so every instance shares them:
 
   Sections nested inside it still fall back to the root client, as they do for `base_url`.
 - After a fork (Puma, Sidekiq, Resque), the child process opens its own connections.
-- `MyApiClient.close_connections` closes idle connections now and in-use ones when they're returned, including the pools of sections that have their own.
+- `transport.close` (or `MyApiClient.close_connections`, with `ConnectionPools`) closes idle connections now and in-use ones when they're returned. `close_connections` also closes the pools of sections that have their own.
 
 Pooling uses only `Net::HTTP` from the standard library.
 
 ### Per-Thread Connections
 
-When a program runs a fixed set of worker threads, each making its own requests, include `ClientApiBuilder::ThreadConnections` (after `Router`, instead of `ConnectionPools`) to give every thread its own persistent connections:
+When a program runs a fixed set of worker threads, each making its own requests, `Transports::ThreadLocal` gives every thread its own persistent connections:
 
 ```ruby
-class MyApiClient
-  include ClientApiBuilder::Router
-  include ClientApiBuilder::ThreadConnections
-
-  base_url 'https://api.example.com'
-
-  # Optional; these are the defaults
-  connection_per_thread ttl: 30,        # seconds before a connection is closed and replaced
-                        idle_timeout: 2 # seconds idle before Net::HTTP reconnects (keep_alive_timeout)
-end
+# Optional settings; these are the defaults
+ClientApiBuilder.use_transport(
+  ClientApiBuilder::Transports::ThreadLocal.new(ttl: 30,        # seconds before a connection is closed and replaced
+                                                idle_timeout: 2) # seconds idle before Net::HTTP reconnects (keep_alive_timeout)
+)
 
 workers = Array.new(20) do
   Thread.new do
@@ -427,22 +477,34 @@ workers = Array.new(20) do
 end
 ```
 
+To make it a client class's default, include `ClientApiBuilder::ThreadConnections` (after `Router`, instead of `ConnectionPools`) and optionally call `connection_per_thread ttl: 30, idle_timeout: 2` in the class.
+
 A thread opens a connection per host (scheme, port and connection options) on its first request and reuses it for every later one. There's no pool size to keep in step with the thread count, and no thread ever waits for another's connection.
 
 - Sockets the server has closed, or that sat idle past `idle_timeout`, are reopened automatically. A connection whose request raised is closed rather than reused.
 - A request made while the thread's connection is busy (from inside a streaming block, or from another fiber on the thread) opens a connection of its own; the thread keeps one of the two afterwards.
-- Connections of threads that have finished are closed when a thread makes its first request. With short-lived threads, prefer `ConnectionPools`.
-- Sections and subclasses share the class's connections the same way they share pools, and a section can call `connection_per_thread` in its block to get its own.
-- After a fork, the child process opens its own connections. `MyApiClient.close_connections` closes every thread's idle connections now and in-use ones when their request ends.
+- Connections of threads that have finished are closed when a thread makes its first request. With short-lived threads, prefer `Transports::Pooled`.
+- With `ThreadConnections`, sections and subclasses share the class's connections the same way they share pools, and a section can call `connection_per_thread` in its block to get its own.
+- After a fork, the child process opens its own connections. `transport.close` (or `MyApiClient.close_connections`) closes every thread's idle connections now and in-use ones when their request ends.
 
 ### HTTP/2
 
-Include `ClientApiBuilder::HTTP2` (after `Router`, and after `ConnectionPools` or `ThreadConnections` if you use either) to send https requests over HTTP/2. It needs the [`http-2`](https://rubygems.org/gems/http-2) gem, which isn't installed with this one:
+`Transports::HTTP2` sends https requests over HTTP/2. It needs the [`http-2`](https://rubygems.org/gems/http-2) gem, which isn't installed with this one:
 
 ```ruby
 # Gemfile
 gem 'http-2'
 ```
+
+```ruby
+# fallback: is used for http:// URLs and servers that only speak HTTP/1.1 (default: OneShot)
+ClientApiBuilder.use_transport(
+  ClientApiBuilder::Transports::HTTP2.new(fallback: ClientApiBuilder::Transports::Pooled.new),
+  MyApiClient
+)
+```
+
+Or make it a client class's default by including `ClientApiBuilder::HTTP2` (after `Router`, and after `ConnectionPools` or `ThreadConnections` to use them as the fallback):
 
 ```ruby
 class MyApiClient
@@ -454,15 +516,15 @@ class MyApiClient
 end
 ```
 
-Every instance of the class shares one connection per host (and connection options), and concurrent requests from different threads travel over it as separate streams. Responses are ordinary `Net::HTTPResponse` objects with `http_version` `'2.0'`, so `handle_response`, `UnexpectedResponse#response` and streaming routes work unchanged.
+Every client using the transport shares one connection per host (and connection options), and concurrent requests from different threads travel over it as separate streams. Responses are ordinary `Net::HTTPResponse` objects with `http_version` `'2.0'`, so `handle_response`, `UnexpectedResponse#response` and streaming routes work unchanged.
 
-- The protocol is negotiated during the TLS handshake (ALPN). When a server picks HTTP/1.1, that host is remembered and its requests go through `Net::HTTP`, or the pooled or per-thread connections if the class includes `ConnectionPools` or `ThreadConnections`. `http://` URLs always use HTTP/1.1.
+- The protocol is negotiated during the TLS handshake (ALPN). When a server picks HTTP/1.1, that host is remembered and its requests go through the fallback transport. `http://` URLs always use the fallback.
 - The usual connection options apply: `open_timeout`, `read_timeout` (per response header and body chunk), and the SSL options (`verify_mode`, `ca_file`, `cert_store`, `cert`, `key`, ...). Proxies aren't supported.
 - When the server's limit on concurrent streams is reached, a request waits up to `read_timeout` for a stream to free up.
 - Gzip and deflate responses are inflated, as `Net::HTTP` does, unless you set `Accept-Encoding` yourself.
 - A stream the server refused, or never processed before closing the connection (GOAWAY), raises `ClientApiBuilder::HTTP2::StreamRefused`; a dropped connection raises `ClientApiBuilder::HTTP2::ConnectionLost`. Both are retried by `configure_retries`. A stream the server reset raises `ClientApiBuilder::HTTP2::StreamError`.
 - Response data is acknowledged to the server as it arrives, so a streaming consumer slower than the server buffers the difference in memory.
-- Sections use their root client's connections. After a fork, the child opens its own. `MyApiClient.close_connections` closes the HTTP/2 connections (and the pooled or per-thread ones).
+- After a fork, the child opens its own connections. `transport.close` (or `MyApiClient.close_connections`, with `include ClientApiBuilder::HTTP2`) closes the HTTP/2 connections and the fallback's.
 
 **When it's faster.** `script/benchmark_http2.rb` compares a new connection per request, `ConnectionPools` and HTTP/2 against a local TLS server. On one machine (Ruby 4.0.7, http-2 1.2.3):
 
@@ -472,7 +534,7 @@ Every instance of the class shares one connection per host (and connection optio
 | 50 threads, 20ms delay, one pooled connection per thread | 628 req/s | 1,904 req/s | 1,765 req/s |
 | 50 threads, 20ms delay, default pool of 5 | 640 req/s | 208 req/s | 1,706 req/s |
 
-HTTP/2 avoids a TLS handshake per request, like the pools, and isn't limited by a connection count: many threads waiting on a slow API share one connection. Per request, it costs more client CPU than pooled HTTP/1.1 (the protocol layer is pure Ruby), which shows most with large bodies. If you can give each thread its own connection (a pool as large as the thread count, or `ThreadConnections`), HTTP/1.1 is usually as fast or faster.
+HTTP/2 avoids a TLS handshake per request, like the pools, and isn't limited by a connection count: many threads waiting on a slow API share one connection. Per request, it costs more client CPU than pooled HTTP/1.1 (the protocol layer is pure Ruby), which shows most with large bodies. If you can give each thread its own connection (a pool as large as the thread count, or `Transports::ThreadLocal`), HTTP/1.1 is usually as fast or faster.
 
 ### Retry Configuration
 
@@ -758,7 +820,7 @@ Only safe file modes are allowed for streaming to files: `w`, `wb`, `a`, `ab`, `
 
 ## Thread Safety
 
-Client instances are **not thread-safe**. Create a separate client instance per thread. To share connections between those instances, see [Persistent Connections](#persistent-connections).
+Client instances are **not thread-safe**. Create a separate client instance per thread. To share connections between those instances, see [Transports](#transports).
 
 ```ruby
 # Correct: Create a new client for each thread
@@ -819,7 +881,7 @@ Define these in your client to change default behavior:
 | Method | Default |
 |--------|---------|
 | `retry_request?(exception, options)` | `true` for the network errors listed under Retry Configuration |
-| `with_http_connection(uri, connection_options, &block)` | Yields a started `Net::HTTP`: a new connection per request, a pooled one with `ConnectionPools`, or the thread's own with `ThreadConnections` |
+| `with_http_connection(uri, connection_options, &block)` | Yields a started `Net::HTTP` (or an HTTP/2 connection) from the client's [transport](#transports) |
 | `escape_path(value)` | Percent-encodes path values (`ERB::Util.url_encode`) |
 | `parse_response(response, options)` | Parses the body as JSON, `nil` when empty |
 | `handle_response(response, options, &block)` | Applies `return:`, parsing and the response block |
