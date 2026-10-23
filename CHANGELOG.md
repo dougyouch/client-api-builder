@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.0](https://github.com/dougyouch/client-api-builder/compare/v1.0.0...v1.1.0) (2026-10-23)
+
+
+### Features
+
+* **transports:** choose how requests are sent per environment ([2193768](https://github.com/dougyouch/client-api-builder/commit/2193768ce8b916ffb9064ccedbd09b87b47def5e))
+
 ## [1.0.0](https://github.com/dougyouch/client-api-builder/compare/v0.11.0...v1.0.0) (2026-10-05)
 
 
