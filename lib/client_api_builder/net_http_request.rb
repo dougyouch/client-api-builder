@@ -50,10 +50,19 @@ module ClientApiBuilder
         end
       end
 
-      # Yields a started Net::HTTP session for one request. By default each request opens
-      # and closes its own connection; ConnectionPools overrides this to reuse pooled ones.
+      # Sends this client's requests through transport instead of its class's
+      attr_writer :transport
+
+      # The transport set on this client, else the one registered for its class (see
+      # Transports::Registry)
+      def transport
+        @transport || ClientApiBuilder.transports.for_class(self.class)
+      end
+
+      # Yields a started Net::HTTP session (or something answering request like one) for one
+      # request, from the client's transport
       def with_http_connection(uri, connection_options, &)
-        Net::HTTP.start(uri.hostname, uri.port, connection_options, &)
+        transport.with_connection(uri, connection_options, &)
       end
 
       # validate_response, when given, is called with the response before its body is streamed

@@ -87,10 +87,10 @@ module ClientApiBuilder
       root_router.handle_response(response, options, &)
     end
 
-    # Uses the root client's connections unless this section calls connection_pool or
-    # connection_per_thread
-    def with_http_connection(uri, connection_options, &)
-      root_router.with_http_connection(uri, connection_options, &)
+    # Uses the root client's transport unless one is set on this section, registered for its
+    # class, or declared by connection_pool or connection_per_thread
+    def transport
+      @transport || ClientApiBuilder.transports.registered_for(self.class) || root_router.transport
     end
 
     private

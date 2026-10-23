@@ -12,7 +12,8 @@
 #
 # Each thread opens its own connection per host on its first request and reuses it for its
 # later ones, so there's no pool size to match to the thread count and no waiting for a
-# connection to free up.
+# connection to free up. The connections are a Transports::ThreadLocal declared as the class's
+# transport, so ClientApiBuilder.use_transport can still pick another one for the class at boot.
 module ClientApiBuilder
   module ThreadConnections
     autoload :ConnectionSet, 'client_api_builder/thread_connections/connection_set'
@@ -30,6 +31,7 @@ module ClientApiBuilder
         raise ArgumentError, 'include ClientApiBuilder::ThreadConnections before ClientApiBuilder::HTTP2'
       end
 
+      base.extend ::ClientApiBuilder::DeclaredTransport
       base.extend ClassMethods
       base.connection_per_thread
     end
@@ -38,7 +40,12 @@ module ClientApiBuilder
       # Configures this class's per-thread connections, replacing any it already had.
       # Subclasses share their parent's unless they call connection_per_thread themselves.
       def connection_per_thread(**settings)
-        redefine_class_method(:thread_connections, ConnectionSet.new(Settings.new(**settings)))
+        redefine_class_method(:http1_transport, ::ClientApiBuilder::Transports::ThreadLocal.new(**settings))
+        declare_transport
+      end
+
+      def thread_connections
+        http1_transport.connection_set
       end
 
       # Closes every thread's idle connections now and in-use ones when their request ends,
@@ -47,10 +54,6 @@ module ClientApiBuilder
         thread_connections.close
         section_routers.each_value(&:close_connections)
       end
-    end
-
-    def with_http_connection(uri, connection_options, &)
-      self.class.thread_connections.with_connection(uri, connection_options, &)
     end
   end
 end

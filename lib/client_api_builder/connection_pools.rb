@@ -12,6 +12,8 @@
 #
 # Each thread uses its own client instance; the instances check connections out of the
 # class's pools (one pool per host and connection options) for the length of one request.
+# The pools are a Transports::Pooled declared as the class's transport, so
+# ClientApiBuilder.use_transport can still pick another one for the class at boot.
 module ClientApiBuilder
   module ConnectionPools
     autoload :Connection, 'client_api_builder/connection_pools/connection'
@@ -34,6 +36,7 @@ module ClientApiBuilder
         raise ArgumentError, 'include ClientApiBuilder::ConnectionPools before ClientApiBuilder::HTTP2'
       end
 
+      base.extend ::ClientApiBuilder::DeclaredTransport
       base.extend ClassMethods
       base.connection_pool
     end
@@ -42,7 +45,12 @@ module ClientApiBuilder
       # Configures this class's pools, replacing any it already had. Subclasses share their
       # parent's pools unless they call connection_pool themselves.
       def connection_pool(**settings)
-        redefine_class_method(:connection_pools, PoolSet.new(Settings.new(**settings)))
+        redefine_class_method(:http1_transport, ::ClientApiBuilder::Transports::Pooled.new(**settings))
+        declare_transport
+      end
+
+      def connection_pools
+        http1_transport.pool_set
       end
 
       # Closes idle connections now and in-use ones when they are returned, including the
@@ -51,10 +59,6 @@ module ClientApiBuilder
         connection_pools.close
         section_routers.each_value(&:close_connections)
       end
-    end
-
-    def with_http_connection(uri, connection_options, &)
-      self.class.connection_pools.with_connection(uri, connection_options, &)
     end
   end
 end

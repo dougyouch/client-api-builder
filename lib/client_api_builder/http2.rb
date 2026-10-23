@@ -15,7 +15,8 @@
 # as streams. TLS negotiates the protocol (ALPN): when the server picks HTTP/1.1, the origin is
 # remembered and its requests go through Net::HTTP (or the pooled or per-thread connections)
 # instead. http URLs always use HTTP/1.1. Responses are Net::HTTPResponse objects with
-# http_version '2.0'.
+# http_version '2.0'. The class's transport becomes a Transports::HTTP2 falling back to its
+# HTTP/1.1 transport; ClientApiBuilder.use_transport can still pick another one at boot.
 module ClientApiBuilder
   module HTTP2
     autoload :Connection, 'client_api_builder/http2/connection'
@@ -43,9 +44,10 @@ module ClientApiBuilder
         raise ArgumentError, 'include ClientApiBuilder::Router before ClientApiBuilder::HTTP2'
       end
 
-      require_http2_gem
+      base.extend ::ClientApiBuilder::DeclaredTransport
       base.extend ClassMethods
-      base.redefine_class_method(:http2_connections, ConnectionSet.new)
+      base.redefine_class_method(:http2_transport, ::ClientApiBuilder::Transports::HTTP2.new)
+      base.declare_transport
     end
 
     def self.require_http2_gem
@@ -55,17 +57,16 @@ module ClientApiBuilder
     end
 
     module ClassMethods
+      def http2_connections
+        http2_transport.connections
+      end
+
       # Closes this class's HTTP/2 connections, and its pooled or per-thread connections when it
       # has them
       def close_connections
         http2_connections.close
         super if defined?(super)
       end
-    end
-
-    def with_http_connection(uri, connection_options, &)
-      connection = uri.scheme == 'https' && self.class.http2_connections.connection_for(uri, connection_options)
-      connection ? yield(connection) : super
     end
   end
 end
